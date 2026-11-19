@@ -4,37 +4,41 @@
 
 import type { Firestore } from "firebase/firestore";
 import { collection, getDocs, doc, getDoc, setDoc, addDoc, query, where, writeBatch, documentId, deleteDoc } from "firebase/firestore";
-import { initialCustomers, type Order, type Quote, type Purchase, type Payment, type Customer, type PurchaseProduct, type DiscountVoucher, type Reservation, type RepairOrder } from './data';
+import { initialCustomers, GENERAL_CUSTOMER, type Order, type Quote, type Purchase, type Customer, type PurchaseProduct, type DiscountVoucher, type Reservation, type RepairOrder } from './data';
 import { db } from './firebase';
+import { loadStore, saveStore } from './local-store';
 import { cancelStockSale, sellStock } from "./product-service";
-import { addCashRegisterMovement } from "./servicios";
+import { addCashRegisterMovement } from "./cash-register-service";
+import { formatLocalDateTime } from "./date-utils";
 
 // --- IN-MEMORY DATA STORE ---
-let memoryCustomers: Customer[] = [];
+const CUSTOMERS_STORE_KEY = 'customers';
+let memoryCustomers: Customer[] = loadStore<Customer[]>(CUSTOMERS_STORE_KEY, []);
 let seedingPromise: Promise<void> | null = null;
 
 async function seedCustomersIfEmpty() {
     if (db) {
-        const q = query(collection(db, 'customers'));
+        const firestore = db;
+        const q = query(collection(firestore, 'customers'));
         const snapshot = await getDocs(q);
         if (snapshot.empty) {
             console.log("Seeding initial customers...");
-            const batch = writeBatch(db);
+            const batch = writeBatch(firestore);
             initialCustomers.forEach(customer => {
-                const docRef = doc(db, 'customers', customer.id);
+                const docRef = doc(firestore, 'customers', customer.id);
                 const { purchaseHistory, orders, quotes, ...customerData } = customer;
                 batch.set(docRef, customerData);
 
                 (purchaseHistory || []).forEach(purchase => {
-                    const purchaseRef = doc(db, 'customers', customer.id, 'purchaseHistory', purchase.invoice);
+                    const purchaseRef = doc(firestore, 'customers', customer.id, 'purchaseHistory', purchase.invoice);
                     batch.set(purchaseRef, purchase);
                 });
                 (orders || []).forEach(order => {
-                    const orderRef = doc(db, 'customers', customer.id, 'orders', order.id);
+                    const orderRef = doc(firestore, 'customers', customer.id, 'orders', order.id);
                     batch.set(orderRef, order);
                 });
                 (quotes || []).forEach(quote => {
-                    const quoteRef = doc(db, 'customers', customer.id, 'quotes', quote.id);
+                    const quoteRef = doc(firestore, 'customers', customer.id, 'quotes', quote.id);
                     batch.set(quoteRef, quote);
                 });
             });
@@ -46,8 +50,20 @@ async function seedCustomersIfEmpty() {
             console.log("Seeding initial customers to memory...");
             memoryCustomers = JSON.parse(JSON.stringify(initialCustomers));
         }
+        // El "Cliente General" (id '0') debe existir para poder registrar
+        // las ventas de mostrador sin cliente asociado.
+        if (!memoryCustomers.some(c => c.id === GENERAL_CUSTOMER.id)) {
+            memoryCustomers.unshift(JSON.parse(JSON.stringify(GENERAL_CUSTOMER)));
+        }
+        persistCustomers();
     }
 }
+
+function persistCustomers() {
+    saveStore(CUSTOMERS_STORE_KEY, memoryCustomers);
+}
+
+const parseQ = (value: string | undefined | null): number => parseFloat((value || '0').replace(/Q|,/g, '')) || 0;
 
 async function ensureDataIsSeeded() {
     if (!seedingPromise) {
@@ -96,7 +112,7 @@ export async function getCustomer(id: string): Promise<Customer | undefined> {
   if (db) {
       const customerDocRef = doc(db, 'customers', id);
       const customerDoc = await getDoc(customerDocRef);
-      if (!customerDoc.exists()) return id === '0' ? JSON.parse(JSON.stringify(initialCustomers.find(c => c.id === '0'))) : undefined;
+      if (!customerDoc.exists()) return id === GENERAL_CUSTOMER.id ? JSON.parse(JSON.stringify(GENERAL_CUSTOMER)) : undefined;
 
       const customerData = { id: customerDoc.id, ...customerDoc.data() } as Customer;
 
@@ -135,37 +151,37 @@ export async function getCustomer(id: string): Promise<Customer | undefined> {
 
 export async function saveCustomer(customerToSave: Customer): Promise<void> {
     await ensureDataIsSeeded();
-    if(customerToSave.id === '0') return; // Do not save the default customer
     
     if (db) {
-        const batch = writeBatch(db);
-        const customerRef = doc(db, 'customers', customerToSave.id);
+        const firestore = db;
+        const batch = writeBatch(firestore);
+        const customerRef = doc(firestore, 'customers', customerToSave.id);
         const { purchaseHistory, orders, quotes, vouchers, reservations, repairOrders, ...customerData } = customerToSave;
         
         batch.set(customerRef, customerData);
 
         (purchaseHistory || []).forEach(purchase => {
-            const purchaseRef = doc(db, 'customers', customerToSave.id, 'purchaseHistory', purchase.invoice);
+            const purchaseRef = doc(firestore, 'customers', customerToSave.id, 'purchaseHistory', purchase.invoice);
             batch.set(purchaseRef, purchase);
         });
         (orders || []).forEach(order => {
-            const orderRef = doc(db, 'customers', customerToSave.id, 'orders', order.id);
+            const orderRef = doc(firestore, 'customers', customerToSave.id, 'orders', order.id);
             batch.set(orderRef, order);
         });
         (quotes || []).forEach(quote => {
-            const quoteRef = doc(db, 'customers', customerToSave.id, 'quotes', quote.id);
+            const quoteRef = doc(firestore, 'customers', customerToSave.id, 'quotes', quote.id);
             batch.set(quoteRef, quote);
         });
          (vouchers || []).forEach(voucher => {
-            const voucherRef = doc(db, 'customers', customerToSave.id, 'vouchers', voucher.id);
+            const voucherRef = doc(firestore, 'customers', customerToSave.id, 'vouchers', voucher.id);
             batch.set(voucherRef, voucher);
         });
         (reservations || []).forEach(reservation => {
-            const reservationRef = doc(db, 'customers', customerToSave.id, 'reservations', reservation.id);
+            const reservationRef = doc(firestore, 'customers', customerToSave.id, 'reservations', reservation.id);
             batch.set(reservationRef, reservation);
         });
         (repairOrders || []).forEach(ro => {
-            const repairRef = doc(db, 'customers', customerToSave.id, 'repairOrders', ro.id);
+            const repairRef = doc(firestore, 'customers', customerToSave.id, 'repairOrders', ro.id);
             batch.set(repairRef, ro);
         });
         
@@ -178,6 +194,7 @@ export async function saveCustomer(customerToSave: Customer): Promise<void> {
         } else {
             memoryCustomers.push(JSON.parse(JSON.stringify(customerToSave)));
         }
+        persistCustomers();
     }
 }
 
@@ -194,14 +211,17 @@ export async function addPurchaseToHistory(customerId: string, purchase: Omit<Pu
 
     // Recalculate and update aggregates if it's a real customer
     if(customerId !== '0') {
-      const currentTotalSpent = parseFloat(customer.totalSpent.replace(/Q|,/g, '')) || 0;
-      const purchaseTotal = parseFloat(purchase.total.replace(/Q|,/g, '')) || 0;
+      const currentTotalSpent = parseQ(customer.totalSpent);
+      const purchaseTotal = parseQ(purchase.total);
       customer.totalSpent = `Q${(currentTotalSpent + purchaseTotal).toFixed(2)}`;
       customer.lastPurchase = purchase.date;
       
-      const currentBalance = parseFloat(customer.currentBalance.replace(/Q|,/g, '')) || 0;
+      const currentBalance = parseQ(customer.currentBalance);
       if(purchase.status !== 'Pagado') {
-         customer.currentBalance = `Q${(currentBalance + purchaseTotal).toFixed(2)}`;
+         // Solo se suma al saldo lo que queda pendiente (descontando abonos iniciales).
+         const alreadyPaid = (purchase.payments || []).reduce((sum, p) => sum + p.amount, 0);
+         const pending = Math.max(0, purchaseTotal - alreadyPaid);
+         customer.currentBalance = `Q${(currentBalance + pending).toFixed(2)}`;
       }
     }
 
@@ -296,7 +316,8 @@ export async function updateOrder(customerId: string, updatedOrder: Order): Prom
         if (customer && customer.orders) {
             const orderIndex = customer.orders.findIndex(o => o.id === updatedOrder.id);
             if (orderIndex !== -1) {
-                customer.orders[orderIndex] = updatedOrder;
+                customer.orders[orderIndex] = JSON.parse(JSON.stringify(updatedOrder));
+                persistCustomers();
             }
         }
     }
@@ -312,7 +333,13 @@ export async function saveOrder(customerId: string, order: Order): Promise<void>
         const customer = memoryCustomers.find(c => c.id === customerId);
         if (customer) {
             if (!customer.orders) customer.orders = [];
-            customer.orders.push(order);
+            const existing = customer.orders.findIndex(o => o.id === order.id);
+            if (existing !== -1) {
+                customer.orders[existing] = JSON.parse(JSON.stringify(order));
+            } else {
+                customer.orders.push(JSON.parse(JSON.stringify(order)));
+            }
+            persistCustomers();
         }
     }
 }
@@ -396,7 +423,8 @@ export async function updateQuote(customerId: string, updatedQuote: Quote): Prom
         if (customer && customer.quotes) {
             const quoteIndex = customer.quotes.findIndex(q => q.id === updatedQuote.id);
             if (quoteIndex !== -1) {
-                customer.quotes[quoteIndex] = updatedQuote;
+                customer.quotes[quoteIndex] = JSON.parse(JSON.stringify(updatedQuote));
+                persistCustomers();
             }
         }
     }
@@ -412,7 +440,13 @@ export async function saveQuote(customerId: string, quote: Quote): Promise<void>
         const customer = memoryCustomers.find(c => c.id === customerId);
         if (customer) {
             if (!customer.quotes) customer.quotes = [];
-            customer.quotes.push(quote);
+            const existing = customer.quotes.findIndex(q => q.id === quote.id);
+            if (existing !== -1) {
+                customer.quotes[existing] = JSON.parse(JSON.stringify(quote));
+            } else {
+                customer.quotes.push(JSON.parse(JSON.stringify(quote)));
+            }
+            persistCustomers();
         }
     }
 }
@@ -439,13 +473,13 @@ export async function getAllInvoices(): Promise<InvoiceWithCustomerAndBalance[]>
             const historySnapshot = await getDocs(historyCol);
             historySnapshot.forEach(doc => {
                 const invoice = doc.data() as Purchase;
-                const totalAmount = parseFloat(invoice.total.replace(/Q|,/g, '')) || 0;
+                const totalAmount = parseQ(invoice.total);
                 const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
                 allInvoices.push({
                     ...invoice,
                     customerId: customer.id,
                     customerName: customer.name,
-                    remaining: totalAmount - paidAmount,
+                    remaining: invoice.status === 'Anulado' ? 0 : totalAmount - paidAmount,
                 });
             });
         }
@@ -453,13 +487,13 @@ export async function getAllInvoices(): Promise<InvoiceWithCustomerAndBalance[]>
          for (const customer of customers) {
             if (customer.purchaseHistory) {
                 for (const invoice of customer.purchaseHistory) {
-                    const totalAmount = parseFloat(invoice.total.replace(/Q|,/g, '')) || 0;
+                    const totalAmount = parseQ(invoice.total);
                     const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
                     allInvoices.push({
                         ...invoice,
                         customerId: customer.id,
                         customerName: customer.name,
-                        remaining: totalAmount - paidAmount,
+                        remaining: invoice.status === 'Anulado' ? 0 : totalAmount - paidAmount,
                     });
                 }
             }
@@ -478,8 +512,14 @@ export async function certifyInvoice(customerId: string, invoiceId: string): Pro
     const invoiceIndex = (customer.purchaseHistory || []).findIndex(p => p.invoice === invoiceId);
     if (invoiceIndex === -1) return;
     
-    // Simulate certification by changing status
-    customer.purchaseHistory[invoiceIndex].status = 'Certificado';
+    const target = customer.purchaseHistory[invoiceIndex];
+    if (target.status === 'Anulado') {
+        throw new Error(`La factura ${invoiceId} está anulada y no se puede certificar.`);
+    }
+    // Una factura ya pagada conserva su estado; solo las pendientes pasan a 'Certificado'.
+    if (target.status !== 'Pagado') {
+        target.status = 'Certificado';
+    }
     
     await saveCustomer(customer);
 }
@@ -493,32 +533,47 @@ export async function cancelInvoice(invoice: InvoiceWithCustomerAndBalance): Pro
     const invoiceIndex = (customer.purchaseHistory || []).findIndex(p => p.invoice === invoice.invoice);
     if (invoiceIndex === -1) return;
     
-    const amountPaid = invoice.remaining > 0 ? (parseFloat(invoice.total.replace(/Q|,/g, '')) - invoice.remaining) : parseFloat(invoice.total.replace(/Q|,/g, ''));
+    const storedInvoice = customer.purchaseHistory[invoiceIndex];
+    if (storedInvoice.status === 'Anulado') {
+        throw new Error(`La factura ${invoice.invoice} ya está anulada.`);
+    }
+
+    // Se recalcula a partir de los datos guardados (no de los recibidos por parámetro)
+    const invoiceTotal = parseQ(storedInvoice.total);
+    const amountPaid = (storedInvoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    const outstanding = Math.max(0, invoiceTotal - amountPaid);
+    // Las facturas registradas como 'Pagado' sin pagos detallados (p. ej. ventas de contado en TPV)
+    // se consideran cobradas completamente.
+    const effectivePaid = storedInvoice.status === 'Pagado' && amountPaid === 0 ? invoiceTotal : amountPaid;
     
+    const originalStatus = storedInvoice.status;
+
     // 1. Change invoice status
-    customer.purchaseHistory[invoiceIndex].status = 'Anulado';
+    storedInvoice.status = 'Anulado';
     
     // 2. Reverse stock
-    // We assume the branchId from the invoice is correct to find the warehouse
-    await cancelStockSale(invoice.products, invoice.invoice, parseInt(invoice.branchId));
+    const warehouseId = parseInt(storedInvoice.warehouseId ?? storedInvoice.branchId, 10) || 1;
+    await cancelStockSale(storedInvoice.products, storedInvoice.invoice, warehouseId);
     
     // 3. Handle payment reversal
-    if (amountPaid > 0) {
-        // A) Create a cash register movement for the refund
+    // A) Lo cobrado se devuelve al cliente desde la caja
+    if (effectivePaid > 0) {
         await addCashRegisterMovement({
             id: Date.now(),
-            fecha: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            fecha: formatLocalDateTime(new Date()),
             tipo: 'Salida Manual',
-            concepto: `Devolución por anulación de Factura ${invoice.invoice}`,
+            concepto: `Devolución por anulación de Factura ${storedInvoice.invoice}`,
             ingreso: 0,
-            egreso: amountPaid,
-            branchId: invoice.branchId,
-            terminalId: invoice.terminalId,
+            egreso: effectivePaid,
+            branchId: storedInvoice.branchId,
+            terminalId: storedInvoice.terminalId,
         });
+    }
 
-        // B) Adjust customer balance
-        const currentBalance = parseFloat(customer.currentBalance.replace(/Q|,/g, '')) || 0;
-        customer.currentBalance = `Q${(currentBalance - amountPaid).toFixed(2)}`;
+    // B) Lo pendiente deja de ser deuda del cliente
+    if (outstanding > 0 && originalStatus !== 'Pagado' && customer.id !== GENERAL_CUSTOMER.id) {
+        const currentBalance = parseQ(customer.currentBalance);
+        customer.currentBalance = `Q${Math.max(0, currentBalance - outstanding).toFixed(2)}`;
     }
     
     await saveCustomer(customer);
@@ -535,6 +590,18 @@ export async function registerPayment(customerId: string, invoiceId: string, pay
 
     const invoice = customer.purchaseHistory[invoiceIndex];
 
+    if (!(paymentAmount > 0)) {
+        throw new Error('El monto del pago debe ser mayor que cero.');
+    }
+    if (invoice.status === 'Anulado') {
+        throw new Error(`La factura ${invoiceId} está anulada.`);
+    }
+    const alreadyPaid = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    const outstandingBefore = parseQ(invoice.total) - alreadyPaid;
+    if (paymentAmount > outstandingBefore + 0.001) {
+        throw new Error(`El pago (Q${paymentAmount.toFixed(2)}) excede el saldo pendiente de la factura (Q${outstandingBefore.toFixed(2)}).`);
+    }
+
     if (!invoice.payments) {
         invoice.payments = [];
     }
@@ -545,7 +612,7 @@ export async function registerPayment(customerId: string, invoiceId: string, pay
         documentNumber: documentNumber || '',
     });
 
-    const invoiceTotal = parseFloat(invoice.total.replace(/Q|,/g, '')) || 0;
+    const invoiceTotal = parseQ(invoice.total);
     const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
     
     if (totalPaid >= invoiceTotal - 0.001) { // Tolerance for float issues
@@ -556,8 +623,8 @@ export async function registerPayment(customerId: string, invoiceId: string, pay
     
     customer.purchaseHistory[invoiceIndex] = invoice;
     
-    if (customerId !== '0') {
-      const currentBalance = parseFloat(customer.currentBalance.replace(/Q|,/g, '')) || 0;
+    if (customerId !== GENERAL_CUSTOMER.id) {
+      const currentBalance = parseQ(customer.currentBalance);
       customer.currentBalance = `Q${(currentBalance - paymentAmount).toFixed(2)}`;
     }
     
@@ -582,7 +649,8 @@ export async function registerBulkPayment(customerId: string, totalPayment: numb
     const customer = await getCustomer(customerId);
     if (!customer) throw new Error("Customer not found.");
 
-    const originalBalance = parseFloat(customer.currentBalance.replace(/Q|,/g, '')) || 0;
+    if (!(totalPayment > 0)) throw new Error('El monto del abono debe ser mayor que cero.');
+    const originalBalance = parseQ(customer.currentBalance);
     let remainingPayment = totalPayment;
     const paymentApplied: { invoiceId: string; amountApplied: number }[] = [];
 
@@ -593,7 +661,7 @@ export async function registerBulkPayment(customerId: string, totalPayment: numb
     for (const invoice of pendingInvoices) {
         if (remainingPayment <= 0) break;
 
-        const invoiceTotal = parseFloat(invoice.total.replace(/Q|,/g, '')) || 0;
+        const invoiceTotal = parseQ(invoice.total);
         const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
         const outstandingAmount = invoiceTotal - totalPaid;
 
@@ -709,15 +777,14 @@ export async function saveReservation(customerId: string, reservationData: Omit<
         }
     } 
 
+    // La numeración debe ser global (no por cliente); si no, dos clientes
+    // tendrían el mismo número de apartado/encargo.
     const prefix = reservationData.type === 'apartado' ? 'AP' : 'EN';
-    const lastReservation = customer.reservations
-        .filter(r => r.id.startsWith(prefix))
-        .sort((a, b) => parseInt(b.id.split('-')[1]) - parseInt(a.id.split('-')[1]))[0];
-
-    let newNumber = 1;
-    if (lastReservation) {
-        newNumber = parseInt(lastReservation.id.split('-')[1]) + 1;
-    }
+    const allReservations = await getAllReservations();
+    const maxNumber = allReservations
+        .filter(r => r.id.startsWith(`${prefix}-`))
+        .reduce((max, r) => Math.max(max, parseInt(r.id.split('-')[1], 10) || 0), 0);
+    const newNumber = maxNumber + 1;
     
     const newReservation: Reservation = {
         ...reservationData,

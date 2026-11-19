@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from './firebase';
 import { type Permission, allPermissions } from "./auth-service";
 import { type UserRole } from "./user-service";
+import { loadStore, saveStore } from './local-store';
 
 export type CompanyInfo = {
   name: string;
@@ -206,7 +207,8 @@ const initialSettings: Settings = {
 };
 
 // --- IN-MEMORY DATA STORE ---
-let memorySettings: Settings = JSON.parse(JSON.stringify(initialSettings));
+const SETTINGS_KEY = 'settings';
+let memorySettings: Settings = loadStore<Settings>(SETTINGS_KEY, initialSettings);
 
 export async function getSettings(): Promise<Settings> {
     return JSON.parse(JSON.stringify(memorySettings));
@@ -214,6 +216,7 @@ export async function getSettings(): Promise<Settings> {
 
 export async function saveSettings(settings: Settings): Promise<void> {
     memorySettings = JSON.parse(JSON.stringify(settings));
+    saveStore(SETTINGS_KEY, memorySettings);
 }
 
 export async function getCompanyInfo(): Promise<CompanyInfo> {

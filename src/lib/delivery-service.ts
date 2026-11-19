@@ -5,6 +5,7 @@ import type { OrderWithCustomer } from './customer-service';
 import { getOrder, updateOrder } from './customer-service';
 import { sellStock } from './product-service';
 import type { Order, OrderProduct } from './data';
+import { loadStore, saveStore } from './local-store';
 
 export interface DeliveryOrder extends OrderWithCustomer {
 }
@@ -32,10 +33,12 @@ const initialData: DeliveryRoute[] = [
 ];
 
 // --- IN-MEMORY DATA STORE ---
-let memoryRoutes: DeliveryRoute[] = JSON.parse(JSON.stringify(initialData));
+const ROUTES_KEY = 'deliveryRoutes';
+let memoryRoutes: DeliveryRoute[] = loadStore<DeliveryRoute[]>(ROUTES_KEY, initialData);
+const persistRoutes = () => saveStore(ROUTES_KEY, memoryRoutes);
 
 export async function getDeliveryRoutes(): Promise<DeliveryRoute[]> {
-    return JSON.parse(JSON.stringify(memoryRoutes)).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return JSON.parse(JSON.stringify(memoryRoutes)).sort((a: DeliveryRoute, b: DeliveryRoute) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function getDeliveryRoute(id: string): Promise<DeliveryRoute | undefined> {
@@ -65,6 +68,7 @@ export async function saveDeliveryRoute(route: DeliveryRoute): Promise<void> {
     } else {
         memoryRoutes.push(JSON.parse(JSON.stringify(route)));
     }
+    persistRoutes();
 }
 
 export async function updateDeliveryRoute(updatedRoute: DeliveryRoute): Promise<void> {

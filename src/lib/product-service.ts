@@ -7,10 +7,9 @@ import type { PurchasedProduct } from './supplier-data';
 import type { OrderProduct, PurchaseProduct } from './data';
 import { getWarehouses } from './settings-service';
 import { getAllReservations } from './customer-service';
+import { loadStore, saveStore } from './local-store';
+import { formatLocalDate } from './date-utils';
 
-const PRODUCTS_COLLECTION = 'products';
-const HISTORY_SUBCOLLECTION = 'history';
-const TRANSFERS_COLLECTION = 'transfers';
 
 
 export interface StockTransferItem {
@@ -29,9 +28,52 @@ export interface StockTransfer {
     notes?: string;
 }
 
-// --- IN-MEMORY DATA STORE ---
-let memoryProducts: Product[] = JSON.parse(JSON.stringify(initialProducts));
-let memoryTransfers: StockTransfer[] = [];
+// --- IN-MEMORY DATA STORE (persistido en localStorage) ---
+const PRODUCTS_KEY = 'products';
+const TRANSFERS_KEY = 'transfers';
+let memoryProducts: Product[] = loadStore<Product[]>(PRODUCTS_KEY, initialProducts);
+let memoryTransfers: StockTransfer[] = loadStore<StockTransfer[]>(TRANSFERS_KEY, []);
+
+const persistProducts = () => saveStore(PRODUCTS_KEY, memoryProducts);
+const persistTransfers = () => saveStore(TRANSFERS_KEY, memoryTransfers);
+
+const ACTIVE_RESERVATION_STATUSES = ['Pendiente', 'Listo para Recoger', 'Esperando Surtido'];
+
+function findProductIndexBySku(sku: string): number {
+    // Primero por SKU exacto; si no, por cualquier código (EAN, UPC...)
+    const bySku = memoryProducts.findIndex(p => p.codes.some(c => c.type === 'SKU' && c.value === sku));
+    if (bySku !== -1) return bySku;
+    return memoryProducts.findIndex(p => p.codes.some(c => c.value === sku));
+}
+
+/**
+ * Suma `delta` al stock del almacén indicado. Si el producto no tenía registro
+ * para ese almacén, se crea (aunque el resultado sea negativo) para que el
+ * inventario y el historial nunca queden desincronizados.
+ */
+async function applyStockDelta(product: Product, warehouseId: number, delta: number): Promise<void> {
+    const stockEntry = product.stock.find(s => s.warehouseId === warehouseId);
+    if (stockEntry) {
+        stockEntry.quantity += delta;
+        return;
+    }
+    const warehouses = await getWarehouses();
+    const warehouse = warehouses.find(w => w.id === warehouseId);
+    product.stock.push({
+        warehouseId,
+        warehouseName: warehouse?.name ?? `Almacén ${warehouseId}`,
+        quantity: delta,
+    });
+}
+
+function computeReservedQty(sku: string | undefined, reservations: { status: string; products: { sku: string; qty: number }[] }[]): number {
+    if (!sku) return 0;
+    return reservations
+        .filter(r => ACTIVE_RESERVATION_STATUSES.includes(r.status))
+        .flatMap(r => r.products)
+        .filter(p => p.sku === sku)
+        .reduce((sum, p) => sum + p.qty, 0);
+}
 
 
 export async function getProducts_server(): Promise<Product[]> {
@@ -42,19 +84,11 @@ export async function getProducts_server(): Promise<Product[]> {
 
 export async function getProducts(): Promise<Product[]> {
     const allActiveReservations = await getAllReservations();
-    const productsWithReservedStock = JSON.parse(JSON.stringify(memoryProducts));
+    const productsWithReservedStock: Product[] = JSON.parse(JSON.stringify(memoryProducts));
 
-    productsWithReservedStock.forEach((product: Product) => {
+    productsWithReservedStock.forEach(product => {
         const productSKU = product.codes.find(c => c.type === 'SKU')?.value;
-        if (!productSKU) return;
-
-        const reservedQty = allActiveReservations
-            .filter(r => ['Pendiente', 'Listo para Recoger', 'Esperando Surtido'].includes(r.status))
-            .flatMap(r => r.products)
-            .filter(p => p.sku === productSKU)
-            .reduce((sum, p) => sum + p.qty, 0);
-        
-        product.reservedStock = reservedQty;
+        product.reservedStock = computeReservedQty(productSKU, allActiveReservations);
     });
 
     return productsWithReservedStock;
@@ -66,63 +100,53 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 
   const allActiveReservations = await getAllReservations();
   const productSKU = product.codes.find(c => c.type === 'SKU')?.value;
-  let reservedQty = 0;
-  
-  if (productSKU) {
-      reservedQty = allActiveReservations
-          .filter(r => ['Pendiente', 'Listo para Recoger', 'Esperando Surtido'].includes(r.status))
-          .flatMap(r => r.products)
-          .filter(p => p.sku === productSKU)
-          .reduce((sum, p) => sum + p.qty, 0);
-  }
 
-  const productWithReservation = JSON.parse(JSON.stringify(product));
-  productWithReservation.reservedStock = reservedQty;
+  const productWithReservation: Product = JSON.parse(JSON.stringify(product));
+  productWithReservation.reservedStock = computeReservedQty(productSKU, allActiveReservations);
   
   return productWithReservation;
 }
 
 export async function saveProduct(productToSave: Product): Promise<void> {
     const { reservedStock, ...productCoreData } = productToSave;
+    const sku = productCoreData.codes?.find(c => c.type === 'SKU')?.value?.trim();
+    if (sku) {
+        const duplicate = memoryProducts.find(p => p.id !== productCoreData.id && p.codes.some(c => c.type === 'SKU' && c.value.trim() === sku));
+        if (duplicate) {
+            throw new Error(`El SKU "${sku}" ya está asignado al producto "${duplicate.name}".`);
+        }
+    }
     const index = memoryProducts.findIndex(p => p.id === productCoreData.id);
     if (index !== -1) {
         memoryProducts[index] = JSON.parse(JSON.stringify(productCoreData));
     } else {
         memoryProducts.push(JSON.parse(JSON.stringify(productCoreData)));
     }
+    persistProducts();
 }
 
 export async function receiveStock(productsToReceive: PurchasedProduct[], orderId: string, warehouseId: number): Promise<void> {
     const warehouses = await getWarehouses();
     const warehouseInfo = warehouses.find(w => w.id === warehouseId);
     if (!warehouseInfo) {
-        console.error(`Warehouse with ID ${warehouseId} not found.`);
-        return;
+        throw new Error(`No existe el almacén con ID ${warehouseId}.`);
     }
 
     for (const receivedProduct of productsToReceive) {
-        const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === receivedProduct.sku));
+        if (!(receivedProduct.qty > 0)) continue;
+        const productIndex = findProductIndexBySku(receivedProduct.sku);
         
         if (productIndex !== -1 && !memoryProducts[productIndex].isService) {
             const productInStock = memoryProducts[productIndex];
-            const stockIndex = productInStock.stock.findIndex(s => s.warehouseId === warehouseId);
-
-            if (stockIndex > -1) {
-                productInStock.stock[stockIndex].quantity += receivedProduct.qty;
-            } else {
-                productInStock.stock.push({
-                    warehouseId: warehouseId,
-                    warehouseName: warehouseInfo.name,
-                    quantity: receivedProduct.qty,
-                });
-            }
+            await applyStockDelta(productInStock, warehouseId, receivedProduct.qty);
             
             productInStock.history.push({
-                date: new Date().toISOString().split('T')[0],
+                date: formatLocalDate(),
                 type: 'Compra',
                 document: `Recepción ${orderId}`,
                 quantity: +receivedProduct.qty,
                 price: receivedProduct.cost,
+                warehouseId,
             });
             await saveProduct(productInStock);
         }
@@ -131,22 +155,20 @@ export async function receiveStock(productsToReceive: PurchasedProduct[], orderI
 
 export async function sellStock(productsToSell: OrderProduct[] | PurchaseProduct[], documentId: string, warehouseId: number): Promise<void> {
     for (const soldProduct of productsToSell) {
-       const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === soldProduct.sku));
+        if (!(soldProduct.qty > 0)) continue;
+        const productIndex = findProductIndexBySku(soldProduct.sku);
 
         if (productIndex !== -1 && !memoryProducts[productIndex].isService) {
             const productInStock = memoryProducts[productIndex];
-            const stockIndex = productInStock.stock.findIndex(s => s.warehouseId === warehouseId);
-
-            if (stockIndex > -1) {
-                productInStock.stock[stockIndex].quantity -= soldProduct.qty;
-            }
+            await applyStockDelta(productInStock, warehouseId, -soldProduct.qty);
 
             productInStock.history.push({
-                date: new Date().toISOString().split('T')[0],
+                date: formatLocalDate(),
                 type: 'Venta',
                 document: `Venta ${documentId}`,
                 quantity: -soldProduct.qty,
                 price: soldProduct.price,
+                warehouseId,
             });
             await saveProduct(productInStock);
         }
@@ -155,24 +177,21 @@ export async function sellStock(productsToSell: OrderProduct[] | PurchaseProduct
 
 export async function cancelStockSale(productsToCancel: PurchaseProduct[], documentId: string, warehouseId: number): Promise<void> {
     for (const canceledProduct of productsToCancel) {
-       const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === canceledProduct.sku));
+        if (!(canceledProduct.qty > 0)) continue;
+        const productIndex = findProductIndexBySku(canceledProduct.sku);
 
         if (productIndex !== -1 && !memoryProducts[productIndex].isService) {
             const productInStock = memoryProducts[productIndex];
-            const stockIndex = productInStock.stock.findIndex(s => s.warehouseId === warehouseId);
-
             // Return stock to the warehouse
-            if (stockIndex > -1) {
-                productInStock.stock[stockIndex].quantity += canceledProduct.qty;
-            }
+            await applyStockDelta(productInStock, warehouseId, canceledProduct.qty);
 
-            // Add a history event for the adjustment
             productInStock.history.push({
-                date: new Date().toISOString().split('T')[0],
+                date: formatLocalDate(),
                 type: 'Ajuste',
                 document: `Anulación Factura ${documentId}`,
                 quantity: +canceledProduct.qty, // Positive quantity for return
                 price: canceledProduct.price,
+                warehouseId,
             });
             await saveProduct(productInStock);
         }
@@ -185,27 +204,23 @@ export async function adjustStockForReturn(
     warehouseId: number
 ): Promise<void> {
     for (const item of returnedItems) {
-        const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === item.sku));
+        if (!(item.returnQty > 0)) continue;
+        const productIndex = findProductIndexBySku(item.sku);
         if (productIndex !== -1 && !memoryProducts[productIndex].isService) {
             const product = memoryProducts[productIndex];
-            const stockIndex = product.stock.findIndex(s => s.warehouseId === warehouseId);
-            if (stockIndex > -1) {
-                product.stock[stockIndex].quantity += item.returnQty;
-            }
-            product.history.push({ date: new Date().toISOString().split('T')[0], type: 'Ajuste', document: 'Devolución de Cliente', quantity: item.returnQty, price: 0 });
+            await applyStockDelta(product, warehouseId, item.returnQty);
+            product.history.push({ date: formatLocalDate(), type: 'Ajuste', document: 'Devolución de Cliente', quantity: item.returnQty, price: 0, warehouseId });
             await saveProduct(product);
         }
     }
 
     for (const item of newSaleItems) {
-        const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === item.sku));
+        if (!(item.qty > 0)) continue;
+        const productIndex = findProductIndexBySku(item.sku);
         if (productIndex !== -1 && !memoryProducts[productIndex].isService) {
             const product = memoryProducts[productIndex];
-            const stockIndex = product.stock.findIndex(s => s.warehouseId === warehouseId);
-            if (stockIndex > -1) {
-                product.stock[stockIndex].quantity -= item.qty;
-            }
-            product.history.push({ date: new Date().toISOString().split('T')[0], type: 'Ajuste', document: 'Venta por Cambio', quantity: -item.qty, price: 0 });
+            await applyStockDelta(product, warehouseId, -item.qty);
+            product.history.push({ date: formatLocalDate(), type: 'Ajuste', document: 'Venta por Cambio', quantity: -item.qty, price: 0, warehouseId });
             await saveProduct(product);
         }
     }
@@ -213,57 +228,78 @@ export async function adjustStockForReturn(
 
 
 export async function transferStock(transfer: StockTransfer): Promise<void> {
+    if (transfer.originWarehouseId === transfer.destinationWarehouseId) {
+        throw new Error('El almacén de origen y el de destino no pueden ser el mismo.');
+    }
+    if (transfer.items.length === 0) {
+        throw new Error('El traslado no contiene productos.');
+    }
     const warehouses = await getWarehouses();
+    const originWarehouse = warehouses.find(w => w.id.toString() === transfer.originWarehouseId);
+    const destWarehouse = warehouses.find(w => w.id.toString() === transfer.destinationWarehouseId);
+    if (!originWarehouse || !destWarehouse) {
+        throw new Error('Almacén de origen o destino no válido.');
+    }
+
+    // 1) Validar TODO antes de modificar nada (evita traslados a medias)
+    const requiredBySku = new Map<string, number>();
     for (const item of transfer.items) {
-        const productIndex = memoryProducts.findIndex(p => p.codes.some(c => c.value === item.sku));
-
-        if (productIndex !== -1) {
-            const productData = memoryProducts[productIndex];
-            const originStockIndex = productData.stock.findIndex(s => s.warehouseId.toString() === transfer.originWarehouseId);
-            const destStockIndex = productData.stock.findIndex(s => s.warehouseId.toString() === transfer.destinationWarehouseId);
-
-            if (originStockIndex === -1 || productData.stock[originStockIndex].quantity < item.quantity) {
-                throw new Error(`Stock insuficiente para ${item.name} en el almacén de origen.`);
-            }
-
-            productData.stock[originStockIndex].quantity -= item.quantity;
-            
-            if (destStockIndex > -1) {
-                productData.stock[destStockIndex].quantity += item.quantity;
-            } else {
-                 const destWarehouse = warehouses.find(w => w.id.toString() === transfer.destinationWarehouseId);
-                 if (destWarehouse) {
-                    productData.stock.push({ warehouseId: destWarehouse.id, warehouseName: destWarehouse.name, quantity: item.quantity });
-                 }
-            }
-            
-            productData.history.push(
-                {
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'Ajuste',
-                    document: `Salida Traslado ${transfer.id} a ${warehouses.find(w=>w.id.toString() === transfer.destinationWarehouseId)?.name}`,
-                    quantity: -item.quantity,
-                    price: 0,
-                },
-                {
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'Ajuste',
-                    document: `Entrada Traslado ${transfer.id} de ${warehouses.find(w=>w.id.toString() === transfer.originWarehouseId)?.name}`,
-                    quantity: +item.quantity,
-                    price: 0,
-                }
-            );
-            await saveProduct(productData);
+        if (!(item.quantity > 0)) throw new Error(`Cantidad inválida para ${item.name}.`);
+        requiredBySku.set(item.sku, (requiredBySku.get(item.sku) || 0) + item.quantity);
+    }
+    for (const [sku, required] of requiredBySku) {
+        const productIndex = findProductIndexBySku(sku);
+        if (productIndex === -1) throw new Error(`No se encontró el producto con código ${sku}.`);
+        const product = memoryProducts[productIndex];
+        if (product.isService) throw new Error(`"${product.name}" es un servicio y no tiene inventario.`);
+        const available = product.stock.find(s => s.warehouseId === originWarehouse.id)?.quantity ?? 0;
+        if (available < required) {
+            throw new Error(`Stock insuficiente para ${product.name} en ${originWarehouse.name} (disponible: ${available}, solicitado: ${required}).`);
         }
     }
+
+    // 2) Aplicar
+    const today = formatLocalDate();
+    for (const item of transfer.items) {
+        const productData = memoryProducts[findProductIndexBySku(item.sku)];
+        await applyStockDelta(productData, originWarehouse.id, -item.quantity);
+        await applyStockDelta(productData, destWarehouse.id, item.quantity);
+        productData.history.push(
+            {
+                date: today,
+                type: 'Ajuste',
+                document: `Salida Traslado ${transfer.id} a ${destWarehouse.name}`,
+                quantity: -item.quantity,
+                price: 0,
+                warehouseId: originWarehouse.id,
+            },
+            {
+                date: today,
+                type: 'Ajuste',
+                document: `Entrada Traslado ${transfer.id} de ${originWarehouse.name}`,
+                quantity: +item.quantity,
+                price: 0,
+                warehouseId: destWarehouse.id,
+            }
+        );
+        await saveProduct(productData);
+    }
     
-    memoryTransfers.push(transfer);
+    memoryTransfers.push(JSON.parse(JSON.stringify(transfer)));
+    persistTransfers();
 }
 
 export async function getAllTransfers(): Promise<StockTransfer[]> {
-    return JSON.parse(JSON.stringify(memoryTransfers)).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const transfers: StockTransfer[] = JSON.parse(JSON.stringify(memoryTransfers));
+    return transfers.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+/**
+ * Recalcula el stock por almacén a partir del historial de movimientos.
+ * Usa el `warehouseId` registrado en cada evento; para eventos antiguos sin
+ * almacén intenta deducirlo del texto del documento de traslado y, si no,
+ * asume el almacén 1 (Central).
+ */
 export async function recalculateProductStock(productId: string): Promise<Record<number, number>> {
     const product = await getProduct(productId);
     if (!product) {
@@ -272,31 +308,29 @@ export async function recalculateProductStock(productId: string): Promise<Record
 
     const stockPerWarehouse: Record<number, number> = {};
     const warehouses = await getWarehouses();
+    const DEFAULT_WAREHOUSE = 1;
 
     for (const historyEvent of product.history) {
-        let warehouseId = 1; // Default to central warehouse
+        let warehouseId = historyEvent.warehouseId ?? DEFAULT_WAREHOUSE;
 
-        if (historyEvent.document.includes('Recepción OC')) {
-            // Need a way to link OC to warehouse, assuming default 1 for now
-        } else if (historyEvent.document.includes('Venta') || historyEvent.document.includes('Anulación')) {
-            // Need a way to link invoice to warehouse, assuming default 1 for now
-        } else if (historyEvent.document.includes('Traslado')) {
-             const destMatch = historyEvent.document.match(/a (.*)$/);
-             const originMatch = historyEvent.document.match(/de (.*)$/);
-             
-             if (historyEvent.type === 'Ajuste' && historyEvent.quantity > 0 && destMatch) { // Entrada
-                const destWarehouse = warehouses.find(w => w.name === destMatch[1]);
-                if (destWarehouse) warehouseId = destWarehouse.id;
-             } else if (historyEvent.type === 'Ajuste' && historyEvent.quantity < 0 && originMatch) { // Salida
-                 const originWarehouse = warehouses.find(w => w.name === originMatch[1]);
-                 if (originWarehouse) warehouseId = originWarehouse.id;
-             }
+        if (historyEvent.warehouseId === undefined) {
+            // "Salida Traslado X a <destino>" → sale del ORIGEN (desconocido en el texto)
+            // "Entrada Traslado X de <origen>" → entra en el DESTINO (desconocido en el texto)
+            // Sin warehouseId no se puede saber con certeza; se intenta con el par opuesto.
+            const salida = historyEvent.document.match(/^Salida Traslado \S+ a (.+)$/);
+            const entrada = historyEvent.document.match(/^Entrada Traslado \S+ de (.+)$/);
+            if (salida) {
+                const dest = warehouses.find(w => w.name === salida[1]);
+                const other = warehouses.find(w => w.id !== dest?.id);
+                if (other) warehouseId = other.id;
+            } else if (entrada) {
+                const origin = warehouses.find(w => w.name === entrada[1]);
+                const other = warehouses.find(w => w.id !== origin?.id);
+                if (other) warehouseId = other.id;
+            }
         }
         
-        if (!stockPerWarehouse[warehouseId]) {
-            stockPerWarehouse[warehouseId] = 0;
-        }
-        stockPerWarehouse[warehouseId] += historyEvent.quantity;
+        stockPerWarehouse[warehouseId] = (stockPerWarehouse[warehouseId] || 0) + historyEvent.quantity;
     }
 
     return stockPerWarehouse;

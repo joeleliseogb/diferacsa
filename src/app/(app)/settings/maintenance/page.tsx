@@ -148,7 +148,7 @@ export default function MaintenancePage() {
 
             setRepairLogs(prev => [...prev, { message: 'Fase 3/3: Verificando Productos...', type: 'info' }]);
             const settings = await getSettings();
-            const supplierIdSet = new Set(settings.suppliers.map(s => s.id));
+            const supplierIdSet = new Set(suppliers.map(s => s.id));
             const priceTierIdSet = new Set(settings.priceTiers.map(t => t.id));
             const warehouseIdSet = new Set(settings.warehouses.map(w => w.id));
 

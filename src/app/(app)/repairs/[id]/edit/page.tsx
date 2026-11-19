@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, PlusCircle, User, Wrench, Package, FileText, FilePlus, Trash2, Milestone, ListChecks, Shield, Printer, History } from 'lucide-react';
+import { ArrowLeft, Save, PlusCircle, User as UserIcon, Wrench, Package, FileText, FilePlus, Trash2, Milestone, ListChecks, Shield, Printer, History } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { getRepairOrder, saveRepairOrder, getProducts, getUsers, addPurchaseToHistory, generateNewInvoiceId, sellStock, getCompanyInfo, getRepairHistoryForEquipment, type RepairOrder, type Product, type User, type Customer } from '@/lib/servicios';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -357,7 +357,7 @@ export default function EditRepairOrderPage() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><User />Cliente y Equipo</CardTitle>
+                            <CardTitle className="flex items-center gap-2"><UserIcon />Cliente y Equipo</CardTitle>
                         </CardHeader>
                          <CardContent className="space-y-4">
                             <div>

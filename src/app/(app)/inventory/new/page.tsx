@@ -103,7 +103,7 @@ export default function NewProductPage() {
   ) => {
     if (!product) return;
     const { name, value } = e.target;
-    setProduct((prev) => (prev ? { ...prev, [name]: value } : null));
+    setProduct((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
   
   const handleAttributeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +115,7 @@ export default function NewProductPage() {
             ...prev.attributes!,
             [name]: value
         }
-    } : null)
+    } : prev)
   }
 
   const handleSelectChange = (
@@ -131,13 +131,13 @@ export default function NewProductPage() {
     }
 
     if(selectedObject){
-        setProduct(prev => prev ? { ...prev, [name]: selectedObject } : null);
+        setProduct(prev => prev ? { ...prev, [name]: selectedObject } : prev);
     }
   };
 
   const handleServiceToggle = (checked: boolean) => {
     if (!product) return;
-    setProduct(prev => prev ? { ...prev, isService: checked } : null);
+    setProduct(prev => prev ? { ...prev, isService: checked } : prev);
   }
 
   const handleCodeChange = (
@@ -148,7 +148,7 @@ export default function NewProductPage() {
     if (!product?.codes) return;
     const newCodes = [...product.codes];
     (newCodes[index] as any)[field] = value;
-    setProduct((prev) => (prev ? { ...prev, codes: newCodes } : null));
+    setProduct((prev) => (prev ? { ...prev, codes: newCodes } : prev));
   };
 
   const addCode = () => {
@@ -162,14 +162,14 @@ export default function NewProductPage() {
               { id: Date.now() + Math.random(), type: 'EAN', value: '' },
             ],
           }
-        : null
+        : prev
     );
   };
 
   const removeCode = (id: number) => {
     if (!product?.codes) return;
     setProduct((prev) =>
-      prev ? { ...prev, codes: (prev.codes || []).filter((c) => c.id !== id) } : null
+      prev ? { ...prev, codes: (prev.codes || []).filter((c) => c.id !== id) } : prev
     );
   };
 
@@ -185,7 +185,7 @@ export default function NewProductPage() {
         newPrices.push({ tierId, tierName: existingTier.name, price: parseFloat(newPrice) || 0 });
     }
     
-    setProduct(prev => prev ? { ...prev, prices: newPrices } : null);
+    setProduct(prev => prev ? { ...prev, prices: newPrices } : prev);
   };
 
   const handleStockChange = (warehouseId: number, newQuantity: string) => {
@@ -203,7 +203,7 @@ export default function NewProductPage() {
               updatedStock.push({ warehouseId, warehouseName: warehouse.name, quantity});
           }
       }
-      setProduct(prev => prev ? {...prev, stock: updatedStock} : null);
+      setProduct(prev => prev ? {...prev, stock: updatedStock} : prev);
   }
 
   const handleSupplierChange = (
@@ -229,7 +229,7 @@ export default function NewProductPage() {
       newSuppliers[index] = { ...newSuppliers[index], cost: parseFloat(value) || 0 };
     }
     
-    setProduct((prev) => (prev ? { ...prev, suppliers: newSuppliers } : null));
+    setProduct((prev) => (prev ? { ...prev, suppliers: newSuppliers } : prev));
   };
 
   const addSupplier = () => {
@@ -248,7 +248,7 @@ export default function NewProductPage() {
             ...prev,
             suppliers: [...(prev.suppliers || []), newSupplier],
           }
-        : null
+        : prev
     );
   };
 
@@ -262,7 +262,7 @@ export default function NewProductPage() {
     }
     
     setProduct((prev) =>
-      prev ? { ...prev, suppliers: updatedSuppliers } : null
+      prev ? { ...prev, suppliers: updatedSuppliers } : prev
     );
   };
   
@@ -272,7 +272,7 @@ export default function NewProductPage() {
       ...s,
       isPrimary: s.relId === relId
     }));
-    setProduct(prev => prev ? { ...prev, suppliers: newSuppliers } : null);
+    setProduct(prev => prev ? { ...prev, suppliers: newSuppliers } : prev);
   }
 
   const handleSaveChanges = async () => {

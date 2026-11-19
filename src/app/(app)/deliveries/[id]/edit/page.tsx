@@ -18,6 +18,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { getCompanyInfo, getDeliveryRoute, updateDeliveryRoute } from '@/lib/servicios';
 import type { DeliveryRoute } from '@/lib/delivery-service';
+import type { CompanyInfo } from '@/lib/settings-service';
 import { PrintableDocument } from '@/components/printable-document';
 
 
@@ -30,7 +31,7 @@ export default function EditDeliveryPage() {
     const [originalStatus, setOriginalStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const printableRef = useRef<HTMLDivElement>(null);
-    const [companyInfo, setCompanyInfo] = useState(null);
+    const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
 
 
     useEffect(() => {

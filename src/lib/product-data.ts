@@ -39,6 +39,8 @@ export interface ProductHistoryEvent {
   document: string;
   quantity: number;
   price: number;
+  /** Almacén afectado por el movimiento (para poder recalcular el stock). */
+  warehouseId?: number;
 }
 
 export interface Product {

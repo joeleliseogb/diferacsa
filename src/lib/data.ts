@@ -39,6 +39,8 @@ export interface Purchase {
   notes?: string;
   branchId: string;
   terminalId?: string;
+  /** Almacén del que se descontó el inventario (si difiere del id de sucursal). */
+  warehouseId?: string;
 }
 
 export interface OrderProduct {
@@ -373,3 +375,31 @@ export const initialCustomers: Customer[] = [
       notes: "Interesada en talleres de bricolaje.",
     },
 ];
+
+/** Cliente genérico para ventas de mostrador (Consumidor Final). */
+export const GENERAL_CUSTOMER: Customer = {
+  id: "0",
+  name: "Cliente General",
+  email: "",
+  phones: [],
+  type: "Particular",
+  avatar: "CG",
+  nit: "CF",
+  fiscalName: "Consumidor Final",
+  totalSpent: "Q0.00",
+  lastPurchase: "N/A",
+  priceTier: "Tarifa General",
+  creditLimit: "Q0.00",
+  creditTerms: "0",
+  currentBalance: "Q0.00",
+  usualPaymentMethod: "Efectivo",
+  maxSalesDiscount: "0%",
+  addresses: [],
+  purchaseHistory: [],
+  orders: [],
+  quotes: [],
+  vouchers: [],
+  reservations: [],
+  repairOrders: [],
+  notes: "Cliente genérico para ventas de mostrador.",
+};

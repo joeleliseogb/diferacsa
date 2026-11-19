@@ -50,7 +50,7 @@ type ProductView = 'grid' | 'list';
 const defaultCustomer: Customer = {
   id: "0", name: "Cliente General", email: "", phones: [], type: "Particular", avatar: "CG", nit: "CF", fiscalName: "Consumidor Final",
   totalSpent: "Q0.00", lastPurchase: "N/A", priceTier: "Tarifa General", creditLimit: "Q0.00", creditTerms: "0",
-  currentBalance: "Q0.00", usualPaymentMethod: "Efectivo", addresses: [], purchaseHistory: [], notes: '',
+  currentBalance: "Q0.00", usualPaymentMethod: "Efectivo", maxSalesDiscount: "0%", addresses: [], purchaseHistory: [], notes: '',
 };
 
 type CalculatorContext = {
@@ -764,7 +764,12 @@ function TPVContent() {
         if (!confirm) return;
     }
     setSelectedCustomerId(sale.customerId);
-    setCart(sale.cart);
+    const resumedCart: CartItem[] = (sale.cart || []).map((item: any) => ({
+        ...item,
+        warehouseId: item.warehouseId || selectedWarehouseId,
+        warehouseName: item.warehouseName || (warehouses.find(w => w.id.toString() === (item.warehouseId || selectedWarehouseId))?.name || 'Almacén'),
+    }));
+    setCart(resumedCart);
     await deleteParkedSale(sale.id);
     toast({ title: "Venta Retomada", description: `Se ha cargado la venta de ${sale.customerName}.` });
     setParkedSalesDialogOpen(false);
@@ -1338,7 +1343,7 @@ function TPVContent() {
                                 <TableCell className="py-2">
                                     <div className="flex items-center gap-1">
                                     <Input
-                                        ref={el => cartItemRefs.current.set(`${item.sku}-${item.warehouseId}`, el)} 
+                                        ref={el => { cartItemRefs.current.set(`${item.sku}-${item.warehouseId}`, el); }} 
                                         type="number"
                                         min="1"
                                         value={item.qty} 

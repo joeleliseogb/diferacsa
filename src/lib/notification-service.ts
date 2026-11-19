@@ -2,6 +2,7 @@
 'use client';
 
 import { getUsers, type UserRole } from "./user-service";
+import { loadStore, saveStore } from './local-store';
 
 export interface Notification {
     id: string;
@@ -14,7 +15,8 @@ export interface Notification {
 }
 
 // In-memory data store for notifications
-let memoryNotifications: Notification[] = [
+const NOTIFS_KEY = 'notifications';
+const initialNotifications: Notification[] = [
     {
         id: "notif-1",
         timestamp: new Date(Date.now() - 3600000).toISOString(),
@@ -26,7 +28,7 @@ let memoryNotifications: Notification[] = [
     {
         id: "notif-2",
         timestamp: new Date(Date.now() - 7200000).toISOString(),
-        role: "Compras",
+        role: "Digitador de Compras",
         message: "Falta de stock para el producto SKU-XYZ solicitado en el encargo #EN-001. Se requiere orden de compra.",
         link: "/purchases/new",
         isRead: false
@@ -40,6 +42,9 @@ let memoryNotifications: Notification[] = [
         isRead: true
     }
 ];
+
+let memoryNotifications: Notification[] = loadStore<Notification[]>(NOTIFS_KEY, initialNotifications);
+const persistNotifs = () => saveStore(NOTIFS_KEY, memoryNotifications);
 
 export async function getNotificationsForUser(userId: string): Promise<Notification[]> {
     const users = await getUsers();
@@ -61,12 +66,14 @@ export async function createNotification(notification: Omit<Notification, 'id' |
         isRead: false,
     };
     memoryNotifications.push(newNotification);
+    persistNotifs();
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
     const notification = memoryNotifications.find(n => n.id === notificationId);
     if (notification) {
         notification.isRead = true;
+        persistNotifs();
     }
 }
 
@@ -75,9 +82,12 @@ export async function markAllNotificationsAsRead(userId: string): Promise<void> 
     const currentUser = users.find(u => u.id === userId);
     if (!currentUser) return;
 
+    let changed = false;
     memoryNotifications.forEach(n => {
         if (n.userId === userId || n.role === currentUser.role) {
             n.isRead = true;
+            changed = true;
         }
     });
+    if (changed) persistNotifs();
 }

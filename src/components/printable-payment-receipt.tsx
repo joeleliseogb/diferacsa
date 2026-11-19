@@ -1,7 +1,8 @@
 
 'use client';
 
-import type { CompanyInfo, Branch, Customer, Supplier } from '@/lib/settings-service';
+import type { CompanyInfo, Branch } from '@/lib/settings-service';
+import type { Customer, Supplier } from '@/lib/servicios';
 import { format } from 'date-fns';
 import Image from 'next/image';
 

@@ -46,6 +46,7 @@ function FormularioNuevoCliente() {
     creditTerms: "0",
     currentBalance: "Q0.00",
     usualPaymentMethod: "Efectivo",
+    maxSalesDiscount: "0%",
     addresses: [],
     notes: ""
   });

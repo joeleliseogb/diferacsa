@@ -4,12 +4,15 @@
 
 import type { Firestore } from 'firebase/firestore';
 import { type Supplier, initialSuppliers, type PurchaseOrder } from './supplier-data';
+import { loadStore, saveStore } from './local-store';
 
 const SUPPLIERS_COLLECTION = 'suppliers';
 const HISTORY_SUBCOLLECTION = 'purchaseHistory';
 
 // --- IN-MEMORY DATA STORE ---
-let memorySuppliers: Supplier[] = JSON.parse(JSON.stringify(initialSuppliers));
+const SUPPLIERS_KEY = 'suppliers';
+let memorySuppliers: Supplier[] = loadStore<Supplier[]>(SUPPLIERS_KEY, initialSuppliers);
+const persistSuppliers = () => saveStore(SUPPLIERS_KEY, memorySuppliers);
 
 export async function getSuppliers(searchTerm?: string): Promise<Supplier[]> {
     let suppliers: Supplier[] = JSON.parse(JSON.stringify(memorySuppliers));
@@ -37,6 +40,7 @@ export async function saveSupplier(supplierToSave: Supplier): Promise<void> {
     } else {
         memorySuppliers.push(JSON.parse(JSON.stringify(supplierToSave)));
     }
+    persistSuppliers();
 }
 
 export interface PurchaseOrderWithSupplier extends PurchaseOrder {

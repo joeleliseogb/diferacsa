@@ -23,6 +23,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 import { getQuote, getProducts, updateQuote, saveOrder, generateNewOrderId, generateNewInvoiceId, addPurchaseToHistory, sellStock, getCompanyInfo } from '@/lib/servicios';
+import type { CompanyInfo } from '@/lib/settings-service';
 
 
 export default function EditQuotePage() {
@@ -35,7 +36,7 @@ export default function EditQuotePage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companyInfo, setCompanyInfo] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const printableRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {

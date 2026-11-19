@@ -1,6 +1,7 @@
 
 
 'use client';
+import { loadStore, saveStore } from './local-store';
 
 export type UserRole = 
   'Admin' 
@@ -24,7 +25,8 @@ export interface User {
 }
 
 // --- IN-MEMORY DATA STORE ---
-const memoryUsers: User[] = [
+const USERS_KEY = 'users';
+const defaultUsers: User[] = [
   { id: '1', name: 'Usuario Admin', email: 'admin@simplygest.com', role: 'Admin' },
   { id: '5', name: 'Laura Méndez', email: 'gerente.general@simplygest.com', role: 'Gerente General' },
   { id: '6', name: 'Ricardo Salas', email: 'gerente.ventas@simplygest.com', role: 'Gerente de Ventas' },
@@ -38,6 +40,9 @@ const memoryUsers: User[] = [
   { id: '10', name: 'Ernesto Cuentas', email: 'ernesto.conta@simplygest.com', role: 'Contable' },
   { id: '11', name: 'Pedro Morales', email: 'pedro.rutas@simplygest.com', role: 'Rutero' },
 ];
+
+let memoryUsers: User[] = loadStore<User[]>(USERS_KEY, defaultUsers);
+const persistUsers = () => saveStore(USERS_KEY, memoryUsers);
 
 export async function getUsers(): Promise<User[]> {
     return JSON.parse(JSON.stringify(memoryUsers));
@@ -55,11 +60,13 @@ export async function saveUser(userToSave: User): Promise<void> {
     } else {
         memoryUsers.push(JSON.parse(JSON.stringify(userToSave)));
     }
+    persistUsers();
 }
 
 export async function deleteUser(userId: string): Promise<void> {
     const index = memoryUsers.findIndex(u => u.id === userId);
     if (index !== -1) {
         memoryUsers.splice(index, 1);
+        persistUsers();
     }
 }
