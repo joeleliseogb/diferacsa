@@ -281,9 +281,8 @@ export default function PaginaDetalleCliente() {
       {/* Tarjeta de contacto principal */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={`https://placehold.co/64x64.png`} alt={cliente.name} data-ai-hint="user avatar" />
-            <AvatarFallback>{cliente.avatar}</AvatarFallback>
+          <Avatar className="h-16 w-16 bg-[#1E2538] text-white font-bold text-xl">
+            <AvatarFallback className="bg-[#1E2538] text-white font-bold text-xl">{cliente.name ? cliente.name.substring(0, 2).toUpperCase() : 'CL'}</AvatarFallback>
           </Avatar>
           <div>
             <CardTitle className="text-2xl">{cliente.name}</CardTitle>

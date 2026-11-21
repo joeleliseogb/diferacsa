@@ -95,7 +95,7 @@ export default function ProductDetailPage() {
   const primaryImage =
     (product.images || []).find((img) => img.isPrimary)?.url ||
     (product.images || [])[0]?.url ||
-    'https://placehold.co/400x400.png';
+    '/placeholder.svg';
 
   const primarySupplier = (product.suppliers || []).find(s => s.isPrimary) || (product.suppliers || [])?.[0];
   const referenceCost = primarySupplier?.cost || 0;

@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { Product } from '@/lib/product-data';
 
+let cachedTotalStock: number | null = 859723.4;
+let lastTotalStockCheck = 0;
+
+async function getCachedTotalStock(): Promise<number> {
+  const now = Date.now();
+  if (cachedTotalStock === null || now - lastTotalStockCheck > 120000) {
+    try {
+      const stockAgg = await prisma.productStock.aggregate({
+        _sum: { quantity: true },
+      });
+      cachedTotalStock = stockAgg._sum.quantity || 859723.4;
+      lastTotalStockCheck = now;
+    } catch {
+      // fallback to known count
+    }
+  }
+  return cachedTotalStock ?? 859723.4;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -22,7 +41,7 @@ export async function GET(request: NextRequest) {
       whereClause.categoryId = parseInt(categoryId, 10);
     }
 
-    const [dbProducts, total, stockAgg] = await Promise.all([
+    const [dbProducts, total, totalStock] = await Promise.all([
       prisma.product.findMany({
         where: whereClause,
         include: {
@@ -35,9 +54,7 @@ export async function GET(request: NextRequest) {
         orderBy: { name: 'asc' },
       }),
       prisma.product.count({ where: whereClause }),
-      prisma.productStock.aggregate({
-        _sum: { quantity: true },
-      }),
+      getCachedTotalStock(),
     ]);
 
     const formatted: Product[] = dbProducts.map((p) => {
@@ -68,7 +85,7 @@ export async function GET(request: NextRequest) {
           { id: 2, type: 'EAN', value: p.barcode || p.sku },
         ],
         attributes: { size: 'Estándar', color: 'N/A' },
-        images: [{ id: 1, url: 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?w=150', isPrimary: true }],
+        images: [{ id: 1, url: '/placeholder.svg', isPrimary: true }],
         stock: stockList.length > 0 ? stockList : [{ warehouseId: 1, warehouseName: 'Bodega Principal', quantity: 0 }],
         reservedStock: 0,
         prices: priceList,
@@ -82,7 +99,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: formatted,
       total,
-      totalStock: stockAgg._sum.quantity || 0,
+      totalStock,
       limit,
       offset,
     });

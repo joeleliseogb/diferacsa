@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       email: c.email || '',
       phones: c.phone ? [{ id: 1, number: c.phone, isPrimary: true }] : [],
       type: c.hasCredit ? 'Mayorista' : 'Minorista',
-      avatar: `https://avatar.vercel.sh/${encodeURIComponent(c.name)}`,
+      avatar: c.name.substring(0, 2).toUpperCase(),
       nit: c.nit || 'CF',
       fiscalName: c.fiscalName || c.name,
       totalSpent: '0.00',

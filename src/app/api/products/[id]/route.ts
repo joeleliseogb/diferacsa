@@ -61,7 +61,7 @@ export async function GET(
         { id: 2, type: 'EAN', value: p.barcode || p.sku },
       ],
       attributes: { size: 'Estándar', color: 'N/A' },
-      images: [{ id: 1, url: 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?w=150', isPrimary: true }],
+      images: [{ id: 1, url: '/placeholder.svg', isPrimary: true }],
       stock: stockList.length > 0 ? stockList : [{ warehouseId: 1, warehouseName: 'Bodega Principal', quantity: 0 }],
       reservedStock: 0,
       prices: priceList,

@@ -128,9 +128,8 @@ export default function CustomersPage() {
                     <TableRow key={customer.id} className="hover:bg-muted/30 transition-colors border-border/50">
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 rounded-full bg-primary/10 text-primary font-bold text-xs flex-shrink-0">
-                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={customer.name} />
-                            <AvatarFallback>{customer.avatar || customer.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          <Avatar className="h-9 w-9 rounded-full bg-[#1E2538] text-white font-bold text-xs flex-shrink-0">
+                            <AvatarFallback className="bg-[#1E2538] text-white font-bold text-xs">{customer.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <Link href={`/customers/${customer.id}`} className="font-semibold text-foreground hover:text-primary transition-colors text-sm truncate block">

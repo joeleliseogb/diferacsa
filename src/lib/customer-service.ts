@@ -491,44 +491,49 @@ export interface InvoiceWithCustomerAndBalance extends InvoiceWithCustomer {
 
 
 export async function getAllInvoices(): Promise<InvoiceWithCustomerAndBalance[]> {
-  await ensureDataIsSeeded();
-  const customers = await getCustomers();
-  let allInvoices: InvoiceWithCustomerAndBalance[] = [];
-
-    if (db) {
-        for (const customer of customers) {
-            const historyCol = collection(db, 'customers', customer.id, 'purchaseHistory');
-            const historySnapshot = await getDocs(historyCol);
-            historySnapshot.forEach(doc => {
-                const invoice = doc.data() as Purchase;
-                const totalAmount = parseQ(invoice.total);
-                const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
-                allInvoices.push({
-                    ...invoice,
-                    customerId: customer.id,
-                    customerName: customer.name,
-                    remaining: invoice.status === 'Anulado' ? 0 : totalAmount - paidAmount,
-                });
-            });
-        }
-    } else {
-         for (const customer of customers) {
-            if (customer.purchaseHistory) {
-                for (const invoice of customer.purchaseHistory) {
-                    const totalAmount = parseQ(invoice.total);
-                    const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
-                    allInvoices.push({
-                        ...invoice,
-                        customerId: customer.id,
-                        customerName: customer.name,
-                        remaining: invoice.status === 'Anulado' ? 0 : totalAmount - paidAmount,
-                    });
-                }
-            }
-        }
+  try {
+    const url = typeof window !== 'undefined'
+      ? '/api/invoices?limit=100'
+      : 'http://localhost:9002/api/invoices?limit=100';
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        return data.items.map((item: any) => ({
+          invoice: item.invoice,
+          date: item.date,
+          products: [],
+          total: item.total,
+          status: item.status,
+          paymentMethod: item.paymentMethod,
+          customerId: item.customerId,
+          customerName: item.customerName,
+          remaining: item.remaining,
+          payments: [],
+        }));
+      }
     }
-    
-  return allInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch {
+    // fallback
+  }
+
+  const customers = memoryCustomers;
+  let allInvoices: InvoiceWithCustomerAndBalance[] = [];
+  for (const customer of customers) {
+    if (customer.purchaseHistory) {
+      for (const invoice of customer.purchaseHistory) {
+        const totalAmount = parseQ(invoice.total);
+        const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
+        allInvoices.push({
+          ...invoice,
+          customerId: customer.id,
+          customerName: customer.name,
+          remaining: invoice.status === 'Anulado' ? 0 : totalAmount - paidAmount,
+        });
+      }
+    }
+  }
+  return allInvoices;
 }
 
 export async function certifyInvoice(customerId: string, invoiceId: string): Promise<void> {
