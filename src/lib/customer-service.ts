@@ -122,6 +122,19 @@ export async function getCustomers(searchTerm?: string): Promise<Customer[]> {
 }
 
 export async function getCustomer(id: string): Promise<Customer | undefined> {
+  try {
+    const url = typeof window !== 'undefined'
+      ? `/api/customers/${encodeURIComponent(id)}`
+      : `http://localhost:9002/api/customers/${encodeURIComponent(id)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data: Customer = await res.json();
+      return data;
+    }
+  } catch {
+    // Fallback a memoria local
+  }
+
   await ensureDataIsSeeded();
   
   if (db) {

@@ -110,6 +110,19 @@ export async function getProducts(searchTerm?: string): Promise<Product[]> {
 }
 
 export async function getProduct(id: string): Promise<Product | undefined> {
+  try {
+    const url = typeof window !== 'undefined'
+      ? `/api/products/${encodeURIComponent(id)}`
+      : `http://localhost:9002/api/products/${encodeURIComponent(id)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data: Product = await res.json();
+      return data;
+    }
+  } catch {
+    // Fallback a memoria local si falla la red
+  }
+
   const product = memoryProducts.find(p => p.id === id);
   if(!product) return undefined;
 
@@ -123,21 +136,27 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 }
 
 export async function saveProduct(productToSave: Product): Promise<void> {
-    const { reservedStock, ...productCoreData } = productToSave;
-    const sku = productCoreData.codes?.find(c => c.type === 'SKU')?.value?.trim();
-    if (sku) {
-        const duplicate = memoryProducts.find(p => p.id !== productCoreData.id && p.codes.some(c => c.type === 'SKU' && c.value.trim() === sku));
-        if (duplicate) {
-            throw new Error(`El SKU "${sku}" ya está asignado al producto "${duplicate.name}".`);
-        }
-    }
-    const index = memoryProducts.findIndex(p => p.id === productCoreData.id);
-    if (index !== -1) {
-        memoryProducts[index] = JSON.parse(JSON.stringify(productCoreData));
-    } else {
-        memoryProducts.push(JSON.parse(JSON.stringify(productCoreData)));
-    }
-    persistProducts();
+  try {
+    const url = typeof window !== 'undefined'
+      ? `/api/products/${encodeURIComponent(productToSave.id)}`
+      : `http://localhost:9002/api/products/${encodeURIComponent(productToSave.id)}`;
+    await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productToSave),
+    });
+  } catch {
+    // Fallback
+  }
+
+  const { reservedStock, ...productCoreData } = productToSave;
+  const index = memoryProducts.findIndex(p => p.id === productCoreData.id);
+  if (index !== -1) {
+    memoryProducts[index] = JSON.parse(JSON.stringify(productCoreData));
+  } else {
+    memoryProducts.push(JSON.parse(JSON.stringify(productCoreData)));
+  }
+  persistProducts();
 }
 
 export async function receiveStock(productsToReceive: PurchasedProduct[], orderId: string, warehouseId: number): Promise<void> {
