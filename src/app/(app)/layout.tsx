@@ -104,9 +104,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Barra Lateral Blanca Limpia (Idéntica a theme.jpeg) */}
           <Sidebar className="border-r border-border/70 bg-card">
             {/* Logo de la empresa: Bloque Navy con letra A/D y texto AcaDigi / Diferacsa */}
-            <SidebarHeader className="p-4 pb-3">
+            <SidebarHeader className="p-4 pb-3 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
               <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-                <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-[#1E2538] text-white font-black text-xl rounded-2xl shadow-sm">
+                <div className="w-10 h-10 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:h-9 flex-shrink-0 flex items-center justify-center bg-[#1E2538] text-white font-black text-xl group-data-[collapsible=icon]:text-lg rounded-2xl group-data-[collapsible=icon]:rounded-xl shadow-sm">
                   D
                 </div>
                 <div className="flex flex-col group-data-[collapsible=icon]:hidden">
@@ -120,25 +120,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarHeader>
 
             {/* Lista de navegación principal */}
-            <SidebarContent className="px-3 py-1">
+            <SidebarContent className="px-3 py-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
               <MainNav />
             </SidebarContent>
 
             {/* Pie del Sidebar: Configuración, Cerrar Sesión y Badge de Estado (como en theme.jpeg) */}
-            <SidebarFooter className="p-3 pt-2 border-t border-border/50 space-y-1">
+            <SidebarFooter className="p-3 pt-2 border-t border-border/50 space-y-1 group-data-[collapsible=icon]:p-1.5 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
               <Link 
                 href="/settings" 
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors group-data-[collapsible=icon]:justify-center"
+                title="Configuración"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:p-0"
               >
-                <Settings className="w-4 h-4 flex-shrink-0" />
+                <Settings className="w-4.5 h-4.5 flex-shrink-0" />
                 <span className="group-data-[collapsible=icon]:hidden">Configuración</span>
               </Link>
 
               <button 
                 onClick={logout}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors group-data-[collapsible=icon]:justify-center"
+                title="Cerrar sesión"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:p-0"
               >
-                <LogOut className="w-4 h-4 flex-shrink-0" />
+                <LogOut className="w-4.5 h-4.5 flex-shrink-0" />
                 <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
               </button>
 

@@ -120,7 +120,7 @@ export function MainNav() {
   }
 
   return (
-    <div className="flex flex-col gap-1 px-1">
+    <div className="flex flex-col gap-1 px-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
       {/* Grupo: Menú Principal */}
       <SidebarGroup className="p-0">
         <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
@@ -132,10 +132,11 @@ export function MainNav() {
                   <SidebarMenuButton
                     asChild
                     isActive={item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href)}
+                    tooltip={item.label}
                   >
                     <Link href={item.href}>
-                      <item.icon className="w-4.5 h-4.5" />
-                      <span>{item.label}</span>
+                      <item.icon className="w-4.5 h-4.5 flex-shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -146,7 +147,7 @@ export function MainNav() {
       </SidebarGroup>
 
       {/* Grupo: Operaciones y Ventas */}
-      <SidebarGroup className="p-0 mt-3">
+      <SidebarGroup className="p-0 mt-3 group-data-[collapsible=icon]:mt-1">
         <SidebarGroupLabel>Ventas y Finanzas</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu className="gap-1">
@@ -157,13 +158,14 @@ export function MainNav() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       isActive={isSalesActive}
-                      className="justify-between"
+                      className="justify-between group-data-[collapsible=icon]:justify-center"
+                      tooltip="Ventas"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <ShoppingCart className="w-4.5 h-4.5" />
-                        <span>Ventas</span>
+                      <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:gap-0">
+                        <ShoppingCart className="w-4.5 h-4.5 flex-shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">Ventas</span>
                       </div>
-                      <ChevronRight className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground", isSalesOpen && "rotate-90 text-primary")} />
+                      <ChevronRight className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground group-data-[collapsible=icon]:hidden", isSalesOpen && "rotate-90 text-primary")} />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -173,7 +175,7 @@ export function MainNav() {
                           <SidebarMenuSubItem key={item.href}>
                             <SidebarMenuSubButton asChild isActive={pathname.startsWith(item.href)}>
                               <Link href={item.href}>
-                                <item.icon className="w-4 h-4" />
+                                <item.icon className="w-4 h-4 flex-shrink-0" />
                                 <span>{item.label}</span>
                               </Link>
                             </SidebarMenuSubButton>
@@ -193,10 +195,11 @@ export function MainNav() {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
+                    tooltip={item.label}
                   >
                     <Link href={item.href}>
-                      <item.icon className="w-4.5 h-4.5" />
-                      <span>{item.label}</span>
+                      <item.icon className="w-4.5 h-4.5 flex-shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -207,7 +210,7 @@ export function MainNav() {
       </SidebarGroup>
 
       {/* Grupo: Gestión y Almacén */}
-      <SidebarGroup className="p-0 mt-3">
+      <SidebarGroup className="p-0 mt-3 group-data-[collapsible=icon]:mt-1">
         <SidebarGroupLabel>Gestión y Stock</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu className="gap-1">
@@ -217,10 +220,11 @@ export function MainNav() {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
+                    tooltip={item.label}
                   >
                     <Link href={item.href}>
-                      <item.icon className="w-4.5 h-4.5" />
-                      <span>{item.label}</span>
+                      <item.icon className="w-4.5 h-4.5 flex-shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -231,7 +235,7 @@ export function MainNav() {
       </SidebarGroup>
 
       {/* Grupo: Sistema y Ajustes */}
-      <SidebarGroup className="p-0 mt-3">
+      <SidebarGroup className="p-0 mt-3 group-data-[collapsible=icon]:mt-1">
         <SidebarGroupLabel>Sistema</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu className="gap-1">
@@ -241,13 +245,14 @@ export function MainNav() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       isActive={isSettingsActive}
-                      className="justify-between"
+                      className="justify-between group-data-[collapsible=icon]:justify-center"
+                      tooltip="Configuración"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Settings className="w-4.5 h-4.5" />
-                        <span>Configuración</span>
+                      <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:gap-0">
+                        <Settings className="w-4.5 h-4.5 flex-shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">Configuración</span>
                       </div>
-                      <ChevronRight className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground", isSettingsOpen && "rotate-90 text-primary")} />
+                      <ChevronRight className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground group-data-[collapsible=icon]:hidden", isSettingsOpen && "rotate-90 text-primary")} />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -266,7 +271,7 @@ export function MainNav() {
                           <SidebarMenuSubItem key={item.href}>
                             <SidebarMenuSubButton asChild isActive={pathname.startsWith(item.href)}>
                               <Link href={item.href}>
-                                <item.icon className="w-4 h-4" />
+                                <item.icon className="w-4 h-4 flex-shrink-0" />
                                 <span>{item.label}</span>
                               </Link>
                             </SidebarMenuSubButton>
