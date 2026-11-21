@@ -104,8 +104,8 @@ export default function PurchasesPage() {
                     </TableRow>
                  ))
               ) : (
-                purchaseOrders.map((order) => (
-                  <TableRow key={order.order}>
+                purchaseOrders.map((order, idx) => (
+                  <TableRow key={order.id ? `po-${order.id}` : `po-${order.order}-${idx}`}>
                     <TableCell className="font-medium">{order.order}</TableCell>
                     <TableCell>{order.supplierName}</TableCell>
                     <TableCell>{order.date}</TableCell>

@@ -72,11 +72,27 @@ export async function saveSupplier(supplierToSave: Supplier): Promise<void> {
 }
 
 export interface PurchaseOrderWithSupplier extends PurchaseOrder {
+    id?: string;
     supplierId: string;
     supplierName: string;
 }
 
 export async function getAllPurchaseOrders(): Promise<PurchaseOrderWithSupplier[]> {
+    try {
+        const url = typeof window !== 'undefined'
+            ? '/api/purchases?limit=200'
+            : 'http://localhost:9002/api/purchases?limit=200';
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.items && data.items.length > 0) {
+                return data.items;
+            }
+        }
+    } catch (e) {
+        console.warn('Fallback to local purchase orders:', e);
+    }
+
     const suppliers = await getSuppliers();
     let allOrders: PurchaseOrderWithSupplier[] = [];
 

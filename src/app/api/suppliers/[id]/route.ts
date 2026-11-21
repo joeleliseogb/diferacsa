@@ -10,6 +10,20 @@ export async function GET(
     const { id } = await params;
     const s = await prisma.supplier.findUnique({
       where: { id },
+      include: {
+        purchases: {
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: { id: true, name: true, sku: true },
+                },
+              },
+            },
+          },
+          orderBy: { date: 'desc' },
+        },
+      },
     });
 
     if (!s) {
@@ -23,6 +37,19 @@ export async function GET(
       .slice(0, 2)
       .join('')
       .toUpperCase() || 'PV';
+
+    const purchases = (s.purchases || []).map((p) => ({
+      order: p.orderNumber,
+      date: p.date ? p.date.toISOString().split('T')[0] : '',
+      total: `Q${p.total.toFixed(2)}`,
+      status: p.status as any,
+      products: p.items.map((it) => ({
+        sku: it.product?.sku || it.productId,
+        name: it.product?.name || it.productId,
+        qty: it.quantity,
+        cost: it.unitCost,
+      })),
+    }));
 
     const supplier: Supplier = {
       id: s.id,
@@ -41,7 +68,7 @@ export async function GET(
       maxPurchaseDiscount: '0%',
       usualPaymentMethod: 'Transferencia Bancaria',
       notes: '',
-      purchaseHistory: [],
+      purchaseHistory: purchases,
     };
 
     return NextResponse.json(supplier);

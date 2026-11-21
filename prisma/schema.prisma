@@ -22,6 +22,7 @@ model Branch {
   isMain      Boolean     @default(false)
   warehouses  Warehouse[]
   invoices    Invoice[]
+  purchases   Purchase[]
   users       User[]
   transfersFrom StockTransfer[] @relation("TransferOrigin")
   transfersTo   StockTransfer[] @relation("TransferDest")
@@ -66,6 +67,7 @@ model Product {
   salesCount  Float          @default(0)
   stocks      ProductStock[]
   prices      ProductPrice[]
+  purchaseItems PurchaseItem[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -132,9 +134,10 @@ model Supplier {
   phone          String?
   email          String?
   address        String?
-  currentBalance Float    @default(0)
-  hasCredit      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  currentBalance Float      @default(0)
+  hasCredit      Boolean    @default(false)
+  purchases      Purchase[]
+  createdAt      DateTime   @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([name])
@@ -176,6 +179,44 @@ model InvoiceItem {
 
   @@index([productId])
   @@index([invoiceId])
+}
+
+model Purchase {
+  id             String         @id
+  branchId       String         @default("branch-matriz")
+  branch         Branch         @relation(fields: [branchId], references: [id])
+  orderNumber    String         // e.g. "OC-001" o NoComprobante
+  supplierId     String
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  date           DateTime       @default(now())
+  total          Float
+  isCredit       Boolean        @default(false)
+  credit         Float?         @default(0)
+  isCancelled    Boolean        @default(false)
+  status         String         @default("Recibido") // "Pendiente", "Recibido", "Pagado", "Cancelado"
+  notes          String?
+  items          PurchaseItem[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([branchId])
+  @@index([supplierId])
+  @@index([date])
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Float
+  unitCost    Float
+  total       Float
+  isDelivered Boolean  @default(true)
+
+  @@index([productId])
+  @@index([purchaseId])
 }
 
 model StockTransfer {
