@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     let invoiceDateFilter = '';
     let purchaseDateFilter = '';
     let trendQuery = '';
+    let periodDays = 365;
 
     if (startDateParam && endDateParam) {
       const startISO = `${startDateParam}T00:00:00Z`;
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
       const startD = new Date(startDateParam);
       const endD = new Date(endDateParam);
       const diffDays = Math.ceil(Math.abs(endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
+      periodDays = Math.max(1, diffDays);
 
       if (diffDays <= 45) {
         trendQuery = `
@@ -68,6 +70,7 @@ export async function GET(request: NextRequest) {
         `;
       }
     } else if (period === 'all') {
+      periodDays = 365;
       trendQuery = `
         SELECT 
           strftime('%Y', date) as label, 
@@ -79,6 +82,7 @@ export async function GET(request: NextRequest) {
         ORDER BY label ASC
       `;
     } else if (period === 'this_month') {
+      periodDays = 31;
       invoiceDateFilter = "AND date >= '2026-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
       purchaseDateFilter = "AND date >= '2026-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
       trendQuery = `
@@ -92,6 +96,7 @@ export async function GET(request: NextRequest) {
         ORDER BY label ASC
       `;
     } else if (period === 'last_month') {
+      periodDays = 30;
       invoiceDateFilter = "AND date >= '2026-04-01T00:00:00Z' AND date <= '2026-04-30T23:59:59Z'";
       purchaseDateFilter = "AND date >= '2026-04-01T00:00:00Z' AND date <= '2026-04-30T23:59:59Z'";
       trendQuery = `
@@ -105,6 +110,7 @@ export async function GET(request: NextRequest) {
         ORDER BY label ASC
       `;
     } else if (period === 'last_30_days') {
+      periodDays = 30;
       invoiceDateFilter = "AND date >= '2026-04-18T00:00:00Z' AND date <= '2026-05-18T23:59:59Z'";
       purchaseDateFilter = "AND date >= '2026-04-18T00:00:00Z' AND date <= '2026-05-18T23:59:59Z'";
       trendQuery = `
@@ -118,6 +124,7 @@ export async function GET(request: NextRequest) {
         ORDER BY label ASC
       `;
     } else if (period === '12months') {
+      periodDays = 365;
       invoiceDateFilter = "AND date >= '2025-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
       purchaseDateFilter = "AND date >= '2025-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
       trendQuery = `
@@ -132,6 +139,7 @@ export async function GET(request: NextRequest) {
       `;
     } else {
       const targetYear = period.replace(/[^0-9]/g, '');
+      periodDays = targetYear === '2026' ? 148 : 365;
       invoiceDateFilter = `AND date >= '${targetYear}-01-01T00:00:00Z' AND date <= '${targetYear}-12-31T23:59:59Z'`;
       purchaseDateFilter = `AND date >= '${targetYear}-01-01T00:00:00Z' AND date <= '${targetYear}-12-31T23:59:59Z'`;
       trendQuery = `
@@ -164,6 +172,7 @@ export async function GET(request: NextRequest) {
       topSuppliersRaw,
       recentCreditMovementsRaw,
       catalogSummaryRaw,
+      reorderRaw,
     ]: any[] = await Promise.all([
       // 1. KPIs de Ventas
       prisma.$queryRawUnsafe(`
@@ -377,6 +386,30 @@ export async function GET(request: NextRequest) {
         ORDER BY salesCount DESC
         LIMIT 500
       `),
+      // 17. Punto de Pedido y Reposición de Inventario (Top 400 productos con rotación activa)
+      prisma.$queryRawUnsafe(`
+        SELECT 
+          p.id,
+          p.sku,
+          p.name,
+          coalesce(cat.name, 'GENERAL') as categoryName,
+          (SELECT coalesce(sum(quantity), 0) FROM ProductStock WHERE productId = p.id) as currentStock,
+          (SELECT coalesce(max(minStock), 5) FROM ProductStock WHERE productId = p.id) as minStock,
+          round(coalesce(sales.unitsSold, 0), 0) as unitsSold,
+          (SELECT coalesce(min(pp.price), 0) FROM ProductPrice pp WHERE pp.productId = p.id AND pp.tierName = 'Normal') as priceNormal
+        FROM (
+          SELECT ii.productId, round(sum(ii.quantity), 0) as unitsSold
+          FROM Invoice inv
+          JOIN InvoiceItem ii ON ii.invoiceId = inv.id
+          WHERE inv.isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY ii.productId
+          ORDER BY unitsSold DESC
+          LIMIT 400
+        ) sales
+        JOIN Product p ON sales.productId = p.id
+        LEFT JOIN Category cat ON p.categoryId = cat.id
+        ORDER BY sales.unitsSold DESC
+      `),
     ]);
 
     const salesKpi = salesKpiRaw[0] || {};
@@ -442,6 +475,75 @@ export async function GET(request: NextRequest) {
       percentage: sumPurchases > 0 ? Math.round((Number(sup.totalPurchased) / sumPurchases) * 1000) / 10 : 0,
     }));
 
+    // 17. Analítica de Punto de Pedido y Reposición de Inventario
+    const defaultLeadTime = 7;
+    const defaultCoverage = 30;
+    let criticalCount = 0;
+    let reorderCount = 0;
+    let optimalCount = 0;
+    let totalReplenishmentCost = 0;
+
+    const reorderItems = (reorderRaw || []).map((item: any) => {
+      const unitsSold = Number(item.unitsSold || 0);
+      const currentStock = Number(item.currentStock || 0);
+      const minStock = Number(item.minStock || 5);
+      const priceNormal = Number(item.priceNormal || 0);
+
+      const dailyDemand = Math.round((unitsSold / Math.max(1, periodDays)) * 100) / 100;
+      const safetyStock = Math.max(minStock, Math.ceil(dailyDemand * 2));
+      const reorderPoint = Math.ceil(dailyDemand * defaultLeadTime) + safetyStock;
+      const targetStock = Math.ceil(dailyDemand * defaultCoverage) + safetyStock;
+
+      let status: 'CRITICAL' | 'REORDER' | 'OPTIMAL' = 'OPTIMAL';
+      let suggestedQty = 0;
+
+      if (currentStock <= minStock || currentStock <= safetyStock) {
+        status = 'CRITICAL';
+        suggestedQty = Math.max(0, targetStock - currentStock);
+        criticalCount++;
+      } else if (currentStock <= reorderPoint) {
+        status = 'REORDER';
+        suggestedQty = Math.max(0, targetStock - currentStock);
+        reorderCount++;
+      } else {
+        status = 'OPTIMAL';
+        suggestedQty = 0;
+        optimalCount++;
+      }
+
+      const estimatedCost = Math.round(suggestedQty * priceNormal * 100) / 100;
+      totalReplenishmentCost += estimatedCost;
+
+      return {
+        id: item.id,
+        sku: item.sku,
+        name: item.name,
+        categoryName: item.categoryName,
+        currentStock,
+        minStock,
+        unitsSold,
+        priceNormal,
+        dailyDemand,
+        safetyStock,
+        reorderPoint,
+        targetStock,
+        suggestedQty,
+        estimatedCost,
+        status,
+      };
+    });
+
+    const reorderAnalytics = {
+      periodDays,
+      defaultLeadTime,
+      defaultCoverage,
+      criticalCount,
+      reorderCount,
+      optimalCount,
+      totalReplenishmentCost: Math.round(totalReplenishmentCost * 100) / 100,
+      items: reorderItems,
+    };
+
     const responsePayload = serializeBigInt({
       period,
       summary: {
@@ -471,6 +573,7 @@ export async function GET(request: NextRequest) {
       topDebtors: topDebtorsRaw,
       recentCreditMovements: recentCreditMovementsRaw,
       catalogSummary: catalogSummaryRaw,
+      reorderAnalytics,
     });
 
     return NextResponse.json(responsePayload);

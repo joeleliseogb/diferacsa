@@ -39,6 +39,12 @@ import {
   ChevronsUpDown,
   X,
   Loader2,
+  AlertTriangle,
+  ShieldAlert,
+  Boxes,
+  SlidersHorizontal,
+  Info,
+  ArrowRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -96,6 +102,35 @@ interface CatalogProduct {
   priceMayorista: number;
 }
 
+interface ReorderItem {
+  id: string;
+  sku: string;
+  name: string;
+  categoryName: string;
+  currentStock: number;
+  minStock: number;
+  unitsSold: number;
+  priceNormal: number;
+  dailyDemand: number;
+  safetyStock: number;
+  reorderPoint: number;
+  targetStock: number;
+  suggestedQty: number;
+  estimatedCost: number;
+  status: 'CRITICAL' | 'REORDER' | 'OPTIMAL';
+}
+
+interface ReorderAnalytics {
+  periodDays: number;
+  defaultLeadTime: number;
+  defaultCoverage: number;
+  criticalCount: number;
+  reorderCount: number;
+  optimalCount: number;
+  totalReplenishmentCost: number;
+  items: ReorderItem[];
+}
+
 interface ReportData {
   period: string;
   summary: {
@@ -125,6 +160,7 @@ interface ReportData {
   supplierComparison: Array<{ id: string; name: string; nit: string; phone: string; purchaseCount: number; totalPurchased: number; percentage: number }>;
   recentCreditMovements: Array<{ id: string; date: string; reason: string; debit: number; credit: number; balance: number; userName: string; customerName: string }>;
   catalogSummary: CatalogProduct[];
+  reorderAnalytics?: ReorderAnalytics;
 }
 
 const PIE_COLORS = ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
@@ -713,6 +749,89 @@ const PrintableReportsDocument = React.forwardRef<HTMLDivElement, PrintableRepor
           </table>
         </div>
 
+        {/* VII. Artículos en Punto de Pedido y Stock Bajo Mínimo (Reposición Sugerida) */}
+        {data.reorderAnalytics && (data.reorderAnalytics.criticalCount > 0 || data.reorderAnalytics.reorderCount > 0) && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', margin: 0 }}>
+                VII. Artículos en Punto de Pedido y Stock Bajo Mínimo (Reposición Sugerida)
+              </h3>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>
+                Lead Time: <strong>{data.reorderAnalytics.defaultLeadTime}d</strong> • Cobertura: <strong>{data.reorderAnalytics.defaultCoverage}d</strong>
+              </span>
+            </div>
+
+            {/* Sub-resumen de alertas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ padding: '5px 8px', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '4px' }}>
+                <span style={{ fontSize: '9.5px', color: '#991B1B', fontWeight: 700, display: 'block' }}>🔴 Stock Bajo Mínimo (Crítico)</span>
+                <span style={{ fontSize: '12px', color: '#DC2626', fontWeight: 800 }}>{data.reorderAnalytics.criticalCount} artículos</span>
+              </div>
+              <div style={{ padding: '5px 8px', backgroundColor: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '4px' }}>
+                <span style={{ fontSize: '9.5px', color: '#92400E', fontWeight: 700, display: 'block' }}>🟡 En Punto de Pedido (ROP)</span>
+                <span style={{ fontSize: '12px', color: '#D97706', fontWeight: 800 }}>{data.reorderAnalytics.reorderCount} artículos</span>
+              </div>
+              <div style={{ padding: '5px 8px', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '4px' }}>
+                <span style={{ fontSize: '9.5px', color: '#475569', fontWeight: 700, display: 'block' }}>💰 Inversión Sugerida Total</span>
+                <span style={{ fontSize: '12px', color: '#1E2538', fontWeight: 800 }}>
+                  Q{data.reorderAnalytics.totalReplenishmentCost.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', width: '25px', textAlign: 'center' }}>#</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', width: '70px' }}>SKU</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538' }}>Producto / Descripción</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'center', width: '50px' }}>Stock</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'center', width: '50px' }}>Mínimo</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'center', width: '50px' }}>ROP</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'center', width: '60px' }}>Pedir</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'right', width: '75px' }}>Inversión (Q)</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #1E2538', textAlign: 'center', width: '75px' }}>Alerta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.reorderAnalytics.items || [])
+                  .filter(i => i.status === 'CRITICAL' || i.status === 'REORDER')
+                  .slice(0, 8)
+                  .map((item, idx) => (
+                    <tr key={item.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', fontFamily: 'monospace', fontWeight: 700, color: '#1E2538' }}>{item.sku}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, color: item.currentStock <= item.minStock ? '#DC2626' : '#D97706' }}>
+                        {item.currentStock.toLocaleString('es-GT')}
+                      </td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', color: '#64748b' }}>{item.minStock}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, color: '#1E2538' }}>{item.reorderPoint}</td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', fontWeight: 800, color: '#FF5722' }}>
+                        +{item.suggestedQty.toLocaleString('es-GT')}
+                      </td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#1E2538' }}>
+                        Q{item.estimatedCost.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: '4px 6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '1px 4px',
+                          borderRadius: '3px',
+                          fontSize: '8.5px',
+                          fontWeight: 800,
+                          backgroundColor: item.status === 'CRITICAL' ? '#FEE2E2' : '#FEF3C7',
+                          color: item.status === 'CRITICAL' ? '#991B1B' : '#92400E',
+                        }}>
+                          {item.status === 'CRITICAL' ? 'BAJO MÍN' : 'PTO. PED'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Sección de Validación, Firmas y Membrete de Cierre */}
         <div style={{ paddingTop: '20px', marginTop: '20px', borderTop: '2px solid #e2e8f0' }}>
           <div className="grid grid-cols-2 gap-12 pb-6">
@@ -760,6 +879,13 @@ export default function ReportsPage() {
   const [productAId, setProductAId] = useState<string>('');
   const [productBId, setProductBId] = useState<string>('');
   const [customProducts, setCustomProducts] = useState<Record<string, CatalogProduct>>({});
+
+  // Estados para Punto de Pedido y Reposición de Inventario
+  const [reorderLeadTime, setReorderLeadTime] = useState<number>(7);
+  const [reorderCoverage, setReorderCoverage] = useState<number>(30);
+  const [reorderSearch, setReorderSearch] = useState<string>('');
+  const [reorderCategory, setReorderCategory] = useState<string>('ALL');
+  const [reorderStatusFilter, setReorderStatusFilter] = useState<string>('ALL');
 
   const handleSelectProductA = (product: CatalogProduct) => {
     setProductAId(product.id);
@@ -922,6 +1048,102 @@ export default function ReportsPage() {
     return data?.catalogSummary?.find(p => p.id === productBId) || customProducts[productBId] || null;
   }, [data, productBId, customProducts]);
 
+  // Cálculo reactivo de Punto de Pedido (ROP) y Cantidad Sugerida según Lead Time y Días de Cobertura
+  const computedReorderItems = useMemo(() => {
+    if (!data?.reorderAnalytics?.items) return [];
+    const pDays = data.reorderAnalytics.periodDays || 148;
+    return data.reorderAnalytics.items.map(item => {
+      const unitsSold = item.unitsSold || 0;
+      const currentStock = item.currentStock || 0;
+      const minStock = item.minStock || 5;
+      const priceNormal = item.priceNormal || 0;
+
+      const dailyDemand = Math.round((unitsSold / Math.max(1, pDays)) * 100) / 100;
+      const safetyStock = Math.max(minStock, Math.ceil(dailyDemand * 2));
+      const reorderPoint = Math.ceil(dailyDemand * reorderLeadTime) + safetyStock;
+      const targetStock = Math.ceil(dailyDemand * reorderCoverage) + safetyStock;
+
+      let status: 'CRITICAL' | 'REORDER' | 'OPTIMAL' = 'OPTIMAL';
+      let suggestedQty = 0;
+
+      if (currentStock <= minStock || currentStock <= safetyStock) {
+        status = 'CRITICAL';
+        suggestedQty = Math.max(0, targetStock - currentStock);
+      } else if (currentStock <= reorderPoint) {
+        status = 'REORDER';
+        suggestedQty = Math.max(0, targetStock - currentStock);
+      } else {
+        status = 'OPTIMAL';
+        suggestedQty = 0;
+      }
+
+      const estimatedCost = Math.round(suggestedQty * priceNormal * 100) / 100;
+
+      return {
+        ...item,
+        dailyDemand,
+        safetyStock,
+        reorderPoint,
+        targetStock,
+        suggestedQty,
+        estimatedCost,
+        status,
+      };
+    });
+  }, [data?.reorderAnalytics, reorderLeadTime, reorderCoverage]);
+
+  // Lista de categorías únicas presentes en la analítica de reorden
+  const reorderCategories = useMemo(() => {
+    const setCat = new Set<string>();
+    (computedReorderItems || []).forEach(i => {
+      if (i.categoryName) setCat.add(i.categoryName);
+    });
+    return Array.from(setCat).sort();
+  }, [computedReorderItems]);
+
+  // Artículos filtrados por buscador, categoría y estado
+  const filteredReorderItems = useMemo(() => {
+    return (computedReorderItems || []).filter(item => {
+      if (reorderCategory !== 'ALL' && item.categoryName !== reorderCategory) {
+        return false;
+      }
+      if (reorderStatusFilter !== 'ALL' && item.status !== reorderStatusFilter) {
+        return false;
+      }
+      if (reorderSearch.trim()) {
+        const q = reorderSearch.trim().toLowerCase();
+        const matchesName = (item.name || '').toLowerCase().includes(q);
+        const matchesSku = (item.sku || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesSku) return false;
+      }
+      return true;
+    });
+  }, [computedReorderItems, reorderCategory, reorderStatusFilter, reorderSearch]);
+
+  // Resumen global dinámico de reposición según parámetros activos
+  const reorderSummary = useMemo(() => {
+    let criticalCount = 0;
+    let reorderCount = 0;
+    let optimalCount = 0;
+    let totalReplenishmentCost = 0;
+
+    (computedReorderItems || []).forEach(item => {
+      if (item.status === 'CRITICAL') criticalCount++;
+      else if (item.status === 'REORDER') reorderCount++;
+      else optimalCount++;
+
+      totalReplenishmentCost += item.estimatedCost;
+    });
+
+    return {
+      criticalCount,
+      reorderCount,
+      optimalCount,
+      totalCount: computedReorderItems.length,
+      totalReplenishmentCost: Math.round(totalReplenishmentCost * 100) / 100,
+    };
+  }, [computedReorderItems]);
+
   // Función para exportar a CSV con BOM UTF-8 compatible con Microsoft Excel
   const handleExportCSV = (tipo: string) => {
     if (!data) return;
@@ -950,6 +1172,21 @@ export default function ReportsPage() {
     } else if (tipo === 'deudores') {
       headers = ['Cliente', 'NIT', 'Teléfono', 'Saldo Pendiente (Q)', 'Límite Crédito (Q)'];
       rows = (data.topDebtors || []).map(d => [`"${d.name.replace(/"/g, '""')}"`, d.nit || 'CF', d.phone || '', d.balance.toFixed(2), d.limitCredit.toFixed(2)]);
+    } else if (tipo === 'reorden') {
+      headers = ['SKU', 'Producto', 'Familia', 'Stock Actual', 'Stock Mínimo', 'Demanda Diaria', 'Punto de Pedido (ROP)', 'Sugerido a Pedir', 'Precio Ref. (Q)', 'Inversión Est. (Q)', 'Estado'];
+      rows = filteredReorderItems.map(item => [
+        item.sku || '',
+        `"${item.name.replace(/"/g, '""')}"`,
+        `"${item.categoryName || 'GENERAL'}"`,
+        item.currentStock.toString(),
+        item.minStock.toString(),
+        item.dailyDemand.toFixed(2),
+        item.reorderPoint.toString(),
+        item.suggestedQty.toString(),
+        item.priceNormal.toFixed(2),
+        item.estimatedCost.toFixed(2),
+        item.status === 'CRITICAL' ? 'Bajo Mínimo (Crítico)' : item.status === 'REORDER' ? 'En Punto de Pedido' : 'Stock Óptimo'
+      ]);
     }
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -1259,6 +1496,15 @@ export default function ReportsPage() {
           <TabsTrigger value="creditos" className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5">
             <CreditCard className="h-4 w-4" />
             <span>Créditos y Cobros</span>
+          </TabsTrigger>
+          <TabsTrigger value="reorden" className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 data-[state=active]:bg-red-500/10 data-[state=active]:text-red-600 dark:data-[state=active]:text-red-400">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <span>Punto de Pedido & Reposición</span>
+            {reorderSummary.criticalCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-red-600 text-white leading-tight">
+                {reorderSummary.criticalCount}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -2171,6 +2417,423 @@ export default function ReportsPage() {
                           </TableCell>
                         </TableRow>
                       ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ================= PESTAÑA 8: PUNTO DE PEDIDO & REPOSICIÓN DE INVENTARIO ================= */}
+        <TabsContent value="reorden" className="space-y-4 mt-0">
+          {/* Tarjeta de Control y Parámetros del Algoritmo ROP */}
+          <Card className="rounded-2xl border-border/70 shadow-sm bg-gradient-to-r from-card via-card to-amber-500/5">
+            <CardHeader className="pb-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-headline flex items-center gap-2">
+                      <span>Punto de Pedido (ROP) & Stock Bajo Mínimo</span>
+                      <Badge variant="outline" className="text-[11px] font-mono border-amber-500/40 text-amber-600 dark:text-amber-400">
+                        Lead Time: {reorderLeadTime}d • Cobertura: {reorderCoverage}d
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Cálculo automatizado de reorden según velocidad diaria de ventas, stock de seguridad y plazos de entrega.
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controles de Parámetros de Cadena de Suministro */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl border border-border/60">
+                  <span className="text-[11px] font-medium text-muted-foreground pl-1">Lead Time:</span>
+                  <Select
+                    value={reorderLeadTime.toString()}
+                    onValueChange={(val) => setReorderLeadTime(Number(val))}
+                  >
+                    <SelectTrigger className="h-8 text-xs w-[110px] rounded-lg bg-background font-mono">
+                      <SelectValue placeholder="Lead Time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 días (Local)</SelectItem>
+                      <SelectItem value="5">5 días (Rápido)</SelectItem>
+                      <SelectItem value="7">7 días (Estándar)</SelectItem>
+                      <SelectItem value="10">10 días</SelectItem>
+                      <SelectItem value="15">15 días (Nacional)</SelectItem>
+                      <SelectItem value="21">21 días (Importación)</SelectItem>
+                      <SelectItem value="30">30 días (Marítimo)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl border border-border/60">
+                  <span className="text-[11px] font-medium text-muted-foreground pl-1">Cobertura:</span>
+                  <Select
+                    value={reorderCoverage.toString()}
+                    onValueChange={(val) => setReorderCoverage(Number(val))}
+                  >
+                    <SelectTrigger className="h-8 text-xs w-[120px] rounded-lg bg-background font-mono">
+                      <SelectValue placeholder="Cobertura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 días (Quincenal)</SelectItem>
+                      <SelectItem value="30">30 días (1 Mes)</SelectItem>
+                      <SelectItem value="45">45 días (1.5 Meses)</SelectItem>
+                      <SelectItem value="60">60 días (Bimestral)</SelectItem>
+                      <SelectItem value="90">90 días (Trimestral)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleExportCSV('reorden')}
+                  className="h-9 px-3 text-xs font-semibold rounded-xl border-border bg-background hover:bg-muted text-foreground gap-1.5 shadow-xs"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Excel (CSV)</span>
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-0">
+              {/* Banner didáctico con la fórmula de reposición */}
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary shrink-0" />
+                  <span>
+                    <strong>Fórmula ROP:</strong> Punto de Pedido = <em>(Demanda Diaria × {reorderLeadTime}d Lead Time) + Stock de Seguridad</em>.
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                  <span className="bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-md font-semibold">
+                    🔴 Bajo Mínimo: Stock ≤ Mínimo
+                  </span>
+                  <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-md font-semibold">
+                    🟡 Punto Pedido: Stock ≤ ROP
+                  </span>
+                  <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md font-semibold">
+                    🟢 Óptimo: Stock &gt; ROP
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 4 Tarjetas de Métricas de Reposición */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <Card className="rounded-2xl border-red-500/30 bg-red-500/5 shadow-xs">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400">Stock Bajo Mínimo (Crítico)</p>
+                  <p className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400 font-mono">
+                    {reorderSummary.criticalCount.toLocaleString('es-GT')}
+                    <span className="text-xs font-normal text-muted-foreground ml-1.5 font-sans">artículos</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Inventario agotado o por debajo del umbral mínimo
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-red-500/20 text-red-600 dark:text-red-400 shrink-0">
+                  <ShieldAlert className="h-6 w-6" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5 shadow-xs">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">En Punto de Pedido (ROP)</p>
+                  <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
+                    {reorderSummary.reorderCount.toLocaleString('es-GT')}
+                    <span className="text-xs font-normal text-muted-foreground ml-1.5 font-sans">artículos</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Requieren emisión urgente de orden de compra
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-emerald-500/30 bg-emerald-500/5 shadow-xs">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Inventario Óptimo</p>
+                  <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+                    {reorderSummary.optimalCount.toLocaleString('es-GT')}
+                    <span className="text-xs font-normal text-muted-foreground ml-1.5 font-sans">artículos</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Existencia suficiente por encima del ROP
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <Boxes className="h-6 w-6" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-primary/30 bg-primary/5 shadow-xs">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-primary">Inversión Total Sugerida</p>
+                  <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                    Q{reorderSummary.totalReplenishmentCost.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Para restablecer stock a {reorderCoverage} días de cobertura
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
+                  <DollarSign className="h-6 w-6" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Barra de Filtros y Búsqueda */}
+          <Card className="rounded-2xl border-border/70 shadow-sm">
+            <CardHeader className="p-4 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-1 flex-wrap items-center gap-2.5">
+                {/* Buscador de Producto por SKU o Nombre */}
+                <div className="relative flex-1 min-w-[240px] max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por SKU o nombre de producto..."
+                    value={reorderSearch}
+                    onChange={(e) => setReorderSearch(e.target.value)}
+                    className="w-full h-9 pl-9 pr-8 text-xs rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  {reorderSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setReorderSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtro por Categoría / Familia */}
+                <Select
+                  value={reorderCategory}
+                  onValueChange={setReorderCategory}
+                >
+                  <SelectTrigger className="h-9 text-xs w-[180px] rounded-xl bg-background border-input font-medium">
+                    <SelectValue placeholder="Todas las Familias" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todas las Familias ({computedReorderItems.length})</SelectItem>
+                    {reorderCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Filtro por Estado / Alerta */}
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setReorderStatusFilter('ALL')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors",
+                      reorderStatusFilter === 'ALL' ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Todos ({computedReorderItems.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReorderStatusFilter('CRITICAL')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors flex items-center gap-1",
+                      reorderStatusFilter === 'CRITICAL' ? "bg-red-500 text-white shadow-xs font-semibold" : "text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                    )}
+                  >
+                    <span>🔴 Bajo Mínimo</span>
+                    <span className="font-mono text-[10px]">({reorderSummary.criticalCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReorderStatusFilter('REORDER')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors flex items-center gap-1",
+                      reorderStatusFilter === 'REORDER' ? "bg-amber-500 text-white shadow-xs font-semibold" : "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                    )}
+                  >
+                    <span>🟡 En ROP</span>
+                    <span className="font-mono text-[10px]">({reorderSummary.reorderCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReorderStatusFilter('OPTIMAL')}
+                    className={cn(
+                      "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors flex items-center gap-1",
+                      reorderStatusFilter === 'OPTIMAL' ? "bg-emerald-600 text-white shadow-xs font-semibold" : "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                    )}
+                  >
+                    <span>🟢 Óptimo</span>
+                    <span className="font-mono text-[10px]">({reorderSummary.optimalCount})</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground font-mono">
+                Mostrando <strong className="text-foreground">{filteredReorderItems.length}</strong> de {computedReorderItems.length} artículos
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="border-t border-border/60 overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[45px] text-center font-semibold text-xs">#</TableHead>
+                      <TableHead className="w-[110px] font-semibold text-xs">SKU</TableHead>
+                      <TableHead className="font-semibold text-xs min-w-[260px]">Producto / Descripción</TableHead>
+                      <TableHead className="font-semibold text-xs">Familia</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Stock Actual</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Mínimo</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Venta Diaria (d)</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Pto. Pedido (ROP)</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Sugerido a Pedir</TableHead>
+                      <TableHead className="text-right font-semibold text-xs">Precio Ref.</TableHead>
+                      <TableHead className="text-right font-semibold text-xs">Inversión Sugerida</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      Array.from({ length: 10 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-52" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-10 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-14 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-20 mx-auto" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : filteredReorderItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={12} className="h-48 text-center text-xs text-muted-foreground">
+                          <Package className="h-8 w-8 mx-auto opacity-40 mb-2" />
+                          <p className="font-medium text-foreground text-sm">No se encontraron productos con los filtros seleccionados</p>
+                          <p className="text-[11px] mt-1">Prueba cambiando el término de búsqueda o el filtro de estado/familia.</p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredReorderItems.map((item, idx) => {
+                        const isCritical = item.status === 'CRITICAL';
+                        const isReorder = item.status === 'REORDER';
+
+                        return (
+                          <TableRow
+                            key={item.id}
+                            className={cn(
+                              "text-xs transition-colors font-mono",
+                              isCritical ? "bg-red-500/[0.03] hover:bg-red-500/[0.08]" : isReorder ? "bg-amber-500/[0.03] hover:bg-amber-500/[0.08]" : "hover:bg-muted/40"
+                            )}
+                          >
+                            <TableCell className="text-center text-muted-foreground font-semibold">{idx + 1}</TableCell>
+                            <TableCell className="font-bold text-foreground">
+                              <Badge variant="outline" className="font-mono text-[11px] px-1.5 py-0 border-border">
+                                {item.sku}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-sans font-medium text-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <span>{item.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-sans text-muted-foreground text-[11px]">
+                              {item.categoryName}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-md font-bold text-xs inline-block",
+                                  isCritical
+                                    ? "bg-red-500/20 text-red-600 dark:text-red-400"
+                                    : isReorder
+                                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                )}
+                              >
+                                {item.currentStock.toLocaleString('es-GT')}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground">
+                              {item.minStock}
+                            </TableCell>
+                            <TableCell className="text-center text-foreground font-medium">
+                              {item.dailyDemand.toFixed(1)} <span className="text-[10px] text-muted-foreground">u/d</span>
+                            </TableCell>
+                            <TableCell className="text-center font-bold text-foreground">
+                              {item.reorderPoint.toLocaleString('es-GT')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {item.suggestedQty > 0 ? (
+                                <Badge
+                                  className={cn(
+                                    "font-mono text-xs px-2 py-0.5 font-bold shadow-xs",
+                                    isCritical ? "bg-red-600 hover:bg-red-600 text-white" : "bg-amber-500 hover:bg-amber-500 text-white"
+                                  )}
+                                >
+                                  +{item.suggestedQty.toLocaleString('es-GT')}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-[11px]">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              Q{item.priceNormal.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-foreground">
+                              {item.estimatedCost > 0 ? (
+                                <span className={isCritical ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}>
+                                  Q{item.estimatedCost.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground font-normal">Q0.00</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {isCritical ? (
+                                <Badge variant="destructive" className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider">
+                                  Bajo Mínimo
+                                </Badge>
+                              ) : isReorder ? (
+                                <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider">
+                                  Punto Pedido
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10 text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider">
+                                  Óptimo
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
