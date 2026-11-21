@@ -271,7 +271,7 @@ export async function GET(request: NextRequest) {
           (SELECT coalesce(min(pp.price), 0) FROM ProductPrice pp WHERE pp.productId = p.id AND pp.tierName = 'Mayorista') as priceMayorista
         FROM Product p
         ORDER BY p.salesCount DESC
-        LIMIT 100
+        LIMIT 500
       `),
     ]);
 

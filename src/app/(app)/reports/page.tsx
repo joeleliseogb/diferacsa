@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import {
   TrendingUp,
   DollarSign,
@@ -30,6 +32,11 @@ import {
   Scale,
   UserCheck,
   CalendarDays,
+  Search,
+  Check,
+  ChevronsUpDown,
+  X,
+  Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -120,6 +127,226 @@ interface ReportData {
 
 const PIE_COLORS = ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
 
+interface ProductSearchComboboxProps {
+  label: string;
+  badgeLabel: string;
+  badgeColorClass: string;
+  selectedId: string;
+  onSelect: (product: CatalogProduct) => void;
+  products: CatalogProduct[];
+  placeholder?: string;
+}
+
+function ProductSearchCombobox({
+  label,
+  badgeLabel,
+  badgeColorClass,
+  selectedId,
+  onSelect,
+  products,
+  placeholder = "Buscar producto por nombre o SKU...",
+}: ProductSearchComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [remoteResults, setRemoteResults] = useState<CatalogProduct[]>([]);
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
+
+  const selectedProduct = useMemo(() => {
+    return products.find(p => p.id === selectedId) || remoteResults.find(p => p.id === selectedId) || null;
+  }, [products, remoteResults, selectedId]);
+
+  // Filtrado reactivo e instantáneo en memoria
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products.slice(0, 100);
+
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const localMatches = products.filter(p => {
+      const name = (p.name || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      return tokens.every(token => name.includes(token) || sku.includes(token));
+    });
+
+    const combined = [...localMatches];
+    remoteResults.forEach(r => {
+      if (!combined.some(c => c.id === r.id)) {
+        combined.push(r);
+      }
+    });
+
+    return combined.slice(0, 100);
+  }, [products, search, remoteResults]);
+
+  // Búsqueda remota inteligente si el término no está en los top precargados
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setRemoteResults([]);
+      setIsSearchingRemote(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingRemote(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&limit=25`);
+        if (res.ok) {
+          const json = await res.json();
+          const items: CatalogProduct[] = (json.items || []).map((item: any) => {
+            const skuCode = item.codes?.find((c: any) => c.type === 'SKU')?.value || item.sku || item.id;
+            const inStock = (item.stock || []).reduce((acc: number, s: any) => acc + (s.quantity || 0), 0);
+            const priceNormal = item.prices?.find((p: any) => p.tierName === 'Normal')?.price || 0;
+            const priceMayorista = item.prices?.find((p: any) => p.tierName === 'Mayorista')?.price || 0;
+            return {
+              id: item.id,
+              sku: skuCode,
+              name: item.name,
+              salesCount: Number(item.salesCount || 0),
+              inStock,
+              priceNormal,
+              priceMayorista,
+            };
+          });
+          setRemoteResults(items);
+        }
+      } catch (err) {
+        console.error('Error in search products:', err);
+      } finally {
+        setIsSearchingRemote(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+          <span className={badgeColorClass}>{badgeLabel}:</span>
+        </label>
+        {selectedProduct && (
+          <span className="text-[11px] font-mono text-muted-foreground">
+            SKU: <strong className="text-foreground">{selectedProduct.sku}</strong>
+          </span>
+        )}
+      </div>
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between h-10 px-3 rounded-xl border border-input bg-background/90 hover:bg-muted/40 text-left font-normal shadow-xs focus:ring-1 focus:ring-primary"
+          >
+            {selectedProduct ? (
+              <div className="flex items-center gap-2 truncate">
+                <Badge variant="secondary" className="font-mono text-[10.5px] px-1.5 py-0 shrink-0">
+                  {selectedProduct.sku}
+                </Badge>
+                <span className="text-xs truncate font-medium text-foreground">
+                  {selectedProduct.name}
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5" /> {placeholder}
+              </span>
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-[340px] sm:w-[480px] p-0 rounded-xl shadow-xl border border-border" align="start">
+          {/* Buscador interactivo integrado directamente en la lista */}
+          <div className="flex items-center gap-2 p-2.5 border-b border-border/70 bg-muted/40">
+            <Search className="h-4 w-4 shrink-0 text-primary" />
+            <input
+              type="text"
+              placeholder="Buscar por código SKU o descripción..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+              autoFocus
+            />
+            {isSearchingRemote && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                title="Limpiar búsqueda"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Información de coincidencias */}
+          <div className="px-3 py-1 bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between border-b border-border/40 font-mono">
+            <span>{filteredProducts.length} producto(s) en lista</span>
+            <span className="text-[10px] opacity-70">Clic para seleccionar</span>
+          </div>
+
+          {/* Lista scrollable de productos filtrados */}
+          <div className="max-h-72 overflow-y-auto divide-y divide-border/30 p-1">
+            {filteredProducts.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground space-y-1">
+                <Package className="h-6 w-6 mx-auto opacity-40 mb-1" />
+                <p className="font-medium text-foreground">No se encontraron productos</p>
+                <p className="text-[11px] opacity-75">Prueba buscando por otra palabra clave o código SKU.</p>
+              </div>
+            ) : (
+              filteredProducts.map((p) => {
+                const isSelected = p.id === selectedId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(p);
+                      setOpen(false);
+                      setSearch('');
+                    }}
+                    className={cn(
+                      "w-full text-left p-2 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 group",
+                      isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted/60 text-foreground"
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-[10.5px] px-1.5 py-0.2 rounded bg-muted/80 text-foreground">
+                          {p.sku}
+                        </span>
+                        <span className="text-[10.5px] text-muted-foreground">
+                          Disp: <strong className={p.inStock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>{p.inStock.toLocaleString('es-GT')}</strong>
+                        </span>
+                        <span className="text-[10.5px] text-muted-foreground">
+                          Ventas: <strong>{p.salesCount.toLocaleString('es-GT')}</strong>
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-foreground truncate mt-1 group-hover:text-primary">
+                        {p.name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-muted-foreground font-mono">
+                        <span>Normal: Q{p.priceNormal.toFixed(2)}</span>
+                        <span>•</span>
+                        <span>Mayorista: Q{p.priceMayorista.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const [period, setPeriod] = useState<string>('all');
   const [data, setData] = useState<ReportData | null>(null);
@@ -130,6 +357,35 @@ export default function ReportsPage() {
   // Estados para el Comparador Interactivo de 2 Productos
   const [productAId, setProductAId] = useState<string>('');
   const [productBId, setProductBId] = useState<string>('');
+  const [customProducts, setCustomProducts] = useState<Record<string, CatalogProduct>>({});
+
+  const handleSelectProductA = (product: CatalogProduct) => {
+    setProductAId(product.id);
+    setCustomProducts(prev => ({ ...prev, [product.id]: product }));
+  };
+
+  const handleSelectProductB = (product: CatalogProduct) => {
+    setProductBId(product.id);
+    setCustomProducts(prev => ({ ...prev, [product.id]: product }));
+  };
+
+  const handleSetCompareFromTop = (prod: any, slot: 'A' | 'B') => {
+    const fromSummary = data?.catalogSummary?.find(p => p.id === prod.id);
+    const catalogItem: CatalogProduct = fromSummary || {
+      id: prod.id,
+      sku: prod.sku,
+      name: prod.name,
+      salesCount: Number(prod.qtySold || 0),
+      inStock: Number(prod.inStock || 0),
+      priceNormal: Number(prod.qtySold > 0 ? prod.totalAmount / prod.qtySold : 0),
+      priceMayorista: 0,
+    };
+    if (slot === 'A') {
+      handleSelectProductA(catalogItem);
+    } else {
+      handleSelectProductB(catalogItem);
+    }
+  };
 
   const fetchReports = async (selectedPeriod: string) => {
     setLoading(true);
@@ -164,12 +420,12 @@ export default function ReportsPage() {
 
   // Comparador de Productos Activos
   const productA = useMemo(() => {
-    return data?.catalogSummary?.find(p => p.id === productAId) || null;
-  }, [data, productAId]);
+    return data?.catalogSummary?.find(p => p.id === productAId) || customProducts[productAId] || null;
+  }, [data, productAId, customProducts]);
 
   const productB = useMemo(() => {
-    return data?.catalogSummary?.find(p => p.id === productBId) || null;
-  }, [data, productBId]);
+    return data?.catalogSummary?.find(p => p.id === productBId) || customProducts[productBId] || null;
+  }, [data, productBId, customProducts]);
 
   // Función para exportar a CSV con BOM UTF-8 compatible con Microsoft Excel
   const handleExportCSV = (tipo: string) => {
@@ -947,39 +1203,27 @@ export default function ReportsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Selectores */}
+              {/* Selectores con buscador integrado en la lista */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-border/60">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Producto A:</label>
-                  <Select value={productAId} onValueChange={setProductAId}>
-                    <SelectTrigger className="h-9 text-xs font-medium rounded-xl">
-                      <SelectValue placeholder="Seleccionar Producto A" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {(data?.catalogSummary || []).map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                          {p.sku} • {p.name.slice(0, 45)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <ProductSearchCombobox
+                  label="Producto A"
+                  badgeLabel="Producto A"
+                  badgeColorClass="text-primary font-bold font-mono"
+                  selectedId={productAId}
+                  onSelect={handleSelectProductA}
+                  products={data?.catalogSummary || []}
+                  placeholder="Buscar Producto A (SKU o nombre)..."
+                />
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Producto B:</label>
-                  <Select value={productBId} onValueChange={setProductBId}>
-                    <SelectTrigger className="h-9 text-xs font-medium rounded-xl">
-                      <SelectValue placeholder="Seleccionar Producto B" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {(data?.catalogSummary || []).map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                          {p.sku} • {p.name.slice(0, 45)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <ProductSearchCombobox
+                  label="Producto B"
+                  badgeLabel="Producto B"
+                  badgeColorClass="text-blue-500 font-bold font-mono"
+                  selectedId={productBId}
+                  onSelect={handleSelectProductB}
+                  products={data?.catalogSummary || []}
+                  placeholder="Buscar Producto B (SKU o nombre)..."
+                />
               </div>
 
               {/* Tarjetas Comparativas Frente a Frente */}
@@ -1069,6 +1313,7 @@ export default function ReportsPage() {
                       <TableHead className="text-center font-semibold text-xs">Stock Disponible</TableHead>
                       <TableHead className="text-right font-semibold text-xs">Unidades Vendidas</TableHead>
                       <TableHead className="text-right font-semibold text-xs">Total Facturado</TableHead>
+                      <TableHead className="text-center font-semibold text-xs">Comparar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1081,6 +1326,7 @@ export default function ReportsPage() {
                           <TableCell><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -1101,6 +1347,28 @@ export default function ReportsPage() {
                           </TableCell>
                           <TableCell className="text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             Q{prod.totalAmount.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-1.5 text-[10.5px] rounded-md font-mono hover:bg-primary/10 hover:text-primary hover:border-primary"
+                                onClick={() => handleSetCompareFromTop(prod, 'A')}
+                                title="Comparar como Producto A"
+                              >
+                                vs A
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-1.5 text-[10.5px] rounded-md font-mono hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-400"
+                                onClick={() => handleSetCompareFromTop(prod, 'B')}
+                                title="Comparar como Producto B"
+                              >
+                                vs B
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
