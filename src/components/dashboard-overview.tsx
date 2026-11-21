@@ -39,15 +39,19 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
           tickFormatter={(value) => `Q${value}`}
         />
         <Tooltip
-          cursor={{ fill: 'hsl(var(--accent) / 0.5)' }}
+          cursor={{ fill: 'hsl(var(--muted) / 0.4)', radius: 8 }}
           contentStyle={{ 
-            backgroundColor: 'hsl(var(--background))', 
-            border: '1px solid hsl(var(--border))',
-            borderRadius: 'var(--radius)' 
+            backgroundColor: 'hsl(var(--card))', 
+            border: '1px solid hsl(var(--border) / 0.8)',
+            borderRadius: '1rem',
+            boxShadow: '0 4px 20px -4px rgba(15, 23, 42, 0.08)',
+            color: 'hsl(var(--foreground))',
+            fontSize: '12px',
+            fontWeight: 500,
           }}
-          formatter={(value: number) => [`Q${value.toFixed(2)}`, 'Total']}
+          formatter={(value: number) => [`Q${value.toFixed(2)}`, 'Ingresos']}
         />
-        <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 4, 4]} maxBarSize={48} />
       </BarChart>
     </ResponsiveContainer>
   )

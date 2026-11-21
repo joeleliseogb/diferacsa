@@ -11,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['PT Sans', 'sans-serif'],
-        headline: ['Poppins', 'sans-serif'],
+        body: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
+        headline: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -73,8 +73,10 @@ export default {
         sm: "calc(var(--radius) - 8px)",
       },
       boxShadow: {
-        sculpted: 'inset 4px 4px 8px hsl(var(--border)), inset -1px -1px 4px hsl(0 0% 100% / 0.05)',
-        illuminated: 'inset 0 0 14px 4px hsl(0 0% 100% / 0.35)',
+        sculpted: '0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)',
+        illuminated: '0 0 0 1px hsl(var(--sidebar-primary-foreground) / 0.1)',
+        subtle: '0 2px 12px -2px rgba(15, 23, 42, 0.04)',
+        card: '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
       },
       keyframes: {
         'accordion-down': {

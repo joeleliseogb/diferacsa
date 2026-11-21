@@ -110,6 +110,8 @@ export const getUsers = () => userService.getUsers();
 export const getUser = (id: string) => userService.getUser(id);
 export const saveUser = (userToSave: User) => userService.saveUser(userToSave);
 export const deleteUser = (userId: string) => userService.deleteUser(userId);
+export const authenticateUser = (emailOrName: string, passwordInput: string) => userService.authenticateUser(emailOrName, passwordInput);
+export const authenticateWithPin = (userId: string, pinInput: string) => userService.authenticateWithPin(userId, pinInput);
 
 // --- Auth Service ---
 export const hasPermission = (role: UserRole, permission: authService.Permission) => authService.hasPermission(role, permission);

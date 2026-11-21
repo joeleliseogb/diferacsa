@@ -937,16 +937,16 @@ function TPVContent() {
             </div>
              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                    <SelectTrigger className="w-[180px] shadow-sculpted"><Building className="h-4 w-4 mr-2" /><SelectValue placeholder="Sucursal..."/></SelectTrigger>
+                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Building className="h-4 w-4 mr-2" /><SelectValue placeholder="Sucursal..."/></SelectTrigger>
                     <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}</SelectContent>
                 </Select>
                  <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="w-[180px] shadow-sculpted"><Warehouse className="h-4 w-4 mr-2" /><SelectValue placeholder="Almacén..."/></SelectTrigger>
+                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Warehouse className="h-4 w-4 mr-2" /><SelectValue placeholder="Almacén..."/></SelectTrigger>
                     <SelectContent>{filteredWarehouses.map(w => <SelectItem key={w.id} value={w.id.toString()}>{w.name}</SelectItem>)}</SelectContent>
                 </Select>
                  <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="shadow-sculpted relative">
+                        <Button variant="outline" className="rounded-xl border-border/80 shadow-xs relative">
                            <FolderClock className="mr-2 h-4 w-4" /> 
                            Ventas Aparcadas {parkedSales.length > 0 && `(${parkedSales.length})`}
                         </Button>
@@ -978,7 +978,7 @@ function TPVContent() {
                     </DialogContent>
                 </Dialog>
                 <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="w-[180px] shadow-sculpted"><Terminal className="h-4 w-4 mr-2" /><SelectValue placeholder="Terminal..." /></SelectTrigger>
+                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Terminal className="h-4 w-4 mr-2" /><SelectValue placeholder="Terminal..." /></SelectTrigger>
                     <SelectContent>{filteredTerminals.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}</SelectContent>
                 </Select>
             </div>
@@ -1057,7 +1057,7 @@ function TPVContent() {
                                     key={product.id} 
                                     onClick={() => handleAddToCart(product)} 
                                     className={cn(
-                                        "p-3 flex flex-col justify-between transition-all group shadow-sculpted",
+                                        "p-3 flex flex-col justify-between transition-all group rounded-2xl border-border/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)]",
                                         "cursor-pointer hover:shadow-md hover:border-primary",
                                         !hasStock && "opacity-50"
                                     )}

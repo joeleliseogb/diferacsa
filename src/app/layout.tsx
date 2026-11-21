@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/context/auth-context';
 
 export const metadata: Metadata = {
-  title: 'SimplyGest',
-  description: 'Sistema de Gestión Empresarial',
+  title: 'Diferacsa - Sistema de Gestión & TPV',
+  description: 'Sistema Integral de Gestión Empresarial y Punto de Venta Diferacsa',
   manifest: '/manifest.json',
 };
 
@@ -17,13 +18,14 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
-        <meta name="theme-color" content="#184e77" />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <meta name="theme-color" content="#1E2538" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body className="font-body antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
