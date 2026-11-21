@@ -585,12 +585,12 @@ export default function MaintenancePage() {
           ],
           attributes: { size: "Grande", color: "Azul" },
           stock: [
-            { warehouseId: 1, warehouseName: "Almacén Central", quantity: 100 },
-            { warehouseId: 2, warehouseName: "Almacén Zona 10", quantity: 50 }
+            { warehouseId: 1, warehouseName: "Bodega Principal / Sala de Ventas", quantity: 100 },
+            { warehouseId: 2, warehouseName: "Bodega Secundaria / Material Pesado", quantity: 50 }
           ],
           prices: [
-            { tierId: 1, tierName: "Tarifa General", price: 150.00 },
-            { tierId: 2, tierName: "Tarifa Mayorista", price: 130.50 },
+            { tierId: 1, tierName: "Normal", price: 150.00 },
+            { tierId: 2, tierName: "Mayorista", price: 130.50 },
           ],
           suppliers: [
             { relId: 1, id: '1', name: 'Importadora Ferretera S.A.', cost: 95.00, lastPurchaseDate: 'N/A', isPrimary: true },

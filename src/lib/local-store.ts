@@ -9,7 +9,7 @@
 // se escribe nada.
 
 const PREFIX = 'simplygest:';
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
 const VERSION_KEY = `${PREFIX}__version`;
 
 const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';

@@ -522,14 +522,14 @@ export default function PaginaDashboard() {
                   <span className="font-mono text-[11px] text-slate-400 mt-0.5">08:00</span>
                   <div>
                     <p className="font-semibold text-white leading-tight">Apertura y Arqueo Inicial</p>
-                    <p className="text-[10px] text-slate-400">Sucursal Central • Turno mañana</p>
+                    <p className="text-[10px] text-slate-400">Casa Matriz (Tacaná) • Turno mañana</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs">
                   <span className="font-mono text-[11px] text-slate-400 mt-0.5">13:30</span>
                   <div>
                     <p className="font-semibold text-white leading-tight">Sincronización de Stock</p>
-                    <p className="text-[10px] text-slate-400">Almacén Central • Sin discrepancias</p>
+                    <p className="text-[10px] text-slate-400">Bodega Principal • Sin discrepancias</p>
                   </div>
                 </div>
               </div>

@@ -86,7 +86,7 @@ export const initialProducts: Product[] = [
       { id: 2, url: 'https://placehold.co/600x600.png', isPrimary: false },
     ],
     stock: [
-      { warehouseId: 1, warehouseName: 'Almacén Central', quantity: 75 },
+      { warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 75 },
       { warehouseId: 2, warehouseName: 'Almacén Zona 10', quantity: 45 },
     ],
     prices: [
@@ -118,7 +118,7 @@ export const initialProducts: Product[] = [
       { id: 1, url: 'https://placehold.co/600x600.png', isPrimary: true },
     ],
     stock: [
-      { warehouseId: 1, warehouseName: 'Almacén Central', quantity: 150 },
+      { warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 150 },
       { warehouseId: 2, warehouseName: 'Almacén Zona 10', quantity: 80 },
     ],
     prices: [
@@ -143,7 +143,7 @@ export const initialProducts: Product[] = [
     codes: [{ id: 1, type: 'SKU', value: 'CEM-01' }],
     attributes: { size: '42.5 kg', color: 'Gris' },
     images: [{ id: 1, url: 'https://placehold.co/600x600.png', isPrimary: true }],
-    stock: [{ warehouseId: 1, warehouseName: 'Almacén Central', quantity: 300 }],
+    stock: [{ warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 300 }],
     prices: [
       { tierId: 1, tierName: 'Tarifa General', price: 75.00 },
       { tierId: 2, tierName: 'Tarifa Mayorista', price: 68.00 },
@@ -162,7 +162,7 @@ export const initialProducts: Product[] = [
     codes: [{ id: 1, type: 'SKU', value: 'ACR-01' }],
     attributes: { size: '1/2" x 6m', color: 'N/A' },
     images: [{ id: 1, url: 'https://placehold.co/600x600.png', isPrimary: true }],
-    stock: [{ warehouseId: 1, warehouseName: 'Almacén Central', quantity: 500 }],
+    stock: [{ warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 500 }],
     prices: [
       { tierId: 1, tierName: 'Tarifa General', price: 45.00 },
       { tierId: 2, tierName: 'Tarifa Mayorista', price: 39.00 },
@@ -181,7 +181,7 @@ export const initialProducts: Product[] = [
     codes: [{ id: 1, type: 'SKU', value: 'LAM-02' }],
     attributes: { size: '12 pies', color: 'Zinc' },
     images: [{ id: 1, url: 'https://placehold.co/600x600.png', isPrimary: true }],
-    stock: [{ warehouseId: 1, warehouseName: 'Almacén Central', quantity: 80 }],
+    stock: [{ warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 80 }],
     prices: [
       { tierId: 1, tierName: 'Tarifa General', price: 150.00 },
       { tierId: 2, tierName: 'Tarifa Mayorista', price: 135.00 },
@@ -199,7 +199,7 @@ export const initialProducts: Product[] = [
     codes: [{ id: 1, type: 'SKU', value: 'TOR-01' }],
     attributes: { size: '1"', color: 'Negro' },
     images: [{ id: 1, url: 'https://placehold.co/600x600.png', isPrimary: true }],
-    stock: [{ warehouseId: 1, warehouseName: 'Almacén Central', quantity: 200 }],
+    stock: [{ warehouseId: 1, warehouseName: 'Bodega Principal / Sala de Ventas', quantity: 200 }],
     prices: [
       { tierId: 1, tierName: 'Tarifa General', price: 25.00 },
       { tierId: 2, tierName: 'Tarifa Mayorista', price: 18.00 },

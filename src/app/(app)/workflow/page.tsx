@@ -63,7 +63,7 @@ const nodeData: Record<NodeKey, NodeDetail> = {
   stock: {
     title: "Gestión Multi-Almacén",
     tag: "Inventario Central",
-    desc: "Administra múltiples ubicaciones físicas (Almacén Central, Bodega Secundaria, Mostrador). Controla traspasos entre sucursales mediante transferencias y asegura que el TPV descuente de la ubicación correcta sin descuadres.",
+    desc: "Administra múltiples ubicaciones físicas (Bodega Principal, Bodega Secundaria, Mostrador). Controla traspasos entre sucursales mediante transferencias y asegura que el TPV descuente de la ubicación correcta sin descuadres.",
     in: "Entradas de compra, traspasos entre bodegas, ajustes por mermas.",
     proc: "Control de stock por ubicación física, bloqueo de productos apartados.",
     out: "Inventario valorizado, reporte de rotación y disponibilidad en vivo.",

@@ -143,20 +143,19 @@ const initialPermissions: Record<UserRole, Permission[]> = {
 
 const initialSettings: Settings = {
   companyInfo: {
-    name: "SimplyGest",
-    nit: "1234567-8",
-    address: "Avenida Las Américas 1-23, Zona 13, Guatemala",
-    phone: "2233-4455",
+    name: "Diferacsa - Ferretería González",
+    nit: "5489119-1",
+    address: "Tacaná, San Marcos",
+    phone: "77703362",
     logoUrl: "",
   },
   branches: [
-    { id: 1, name: "Sucursal Central", address: "Zona 1, Ciudad de Guatemala", logoUrl: ""},
-    { id: 2, name: "Sucursal Zona 10", address: "Zona 10, Ciudad de Guatemala", logoUrl: ""},
+    { id: 1, name: "Casa Matriz - Ferretería González (Tacaná)", address: "Tacaná, San Marcos", logoUrl: ""},
   ],
   priceTiers: [
-    { id: 1, name: "Tarifa General" },
-    { id: 2, name: "Tarifa Mayorista" },
-    { id: 3, name: "Tarifa Profesional" },
+    { id: 1, name: "Normal" },
+    { id: 2, name: "Mayorista" },
+    { id: 3, name: "Especial" },
   ],
   paymentMethods: [
     { id: 1, name: "Efectivo" },
@@ -165,32 +164,33 @@ const initialSettings: Settings = {
     { id: 4, name: "Cheque" },
   ],
   documentSeries: [
-    { id: 1, documentType: "Factura", branch: "Sucursal Central", series: "FACA", currentNumber: 1250 },
-    { id: 2, documentType: "Presupuesto", branch: "Sucursal Central", series: "PRE-C", currentNumber: 830 },
-    { id: 3, documentType: "Factura", branch: "Sucursal Zona 10", series: "FAZ10", currentNumber: 480 },
-    { id: 4, documentType: "Nota de Crédito", branch: "Sucursal Central", series: "NC-C", currentNumber: 95 },
+    { id: 1, documentType: "Factura", branch: "Casa Matriz - Ferretería González (Tacaná)", series: "FACA", currentNumber: 1250 },
+    { id: 2, documentType: "Presupuesto", branch: "Casa Matriz - Ferretería González (Tacaná)", series: "PRE-C", currentNumber: 830 },
+    { id: 3, documentType: "Nota de Crédito", branch: "Casa Matriz - Ferretería González (Tacaná)", series: "NC-C", currentNumber: 95 },
   ],
   posTerminals: [
-    { id: 1, name: "Terminal Principal", branch: "Sucursal Central", invoiceSeries: "FACA" },
-    { id: 2, name: "Terminal 2", branch: "Sucursal Central", invoiceSeries: "FACA" },
-    { id: 3, name: "Mostrador Zona 10", branch: "Sucursal Zona 10", invoiceSeries: "FAZ10" },
+    { id: 1, name: "Terminal Principal", branch: "Casa Matriz - Ferretería González (Tacaná)", invoiceSeries: "FACA" },
+    { id: 2, name: "Terminal 2", branch: "Casa Matriz - Ferretería González (Tacaná)", invoiceSeries: "FACA" },
   ],
   warehouses: [
-    { id: 1, name: "Almacén Central", location: "Zona 1, Ciudad de Guatemala", capacity: "500 m²", manager: "Juan Pérez", branch: "Sucursal Central" },
-    { id: 2, name: "Almacén Zona 10", location: "Zona 10, Ciudad de Guatemala", capacity: "200 m²", manager: "María López", branch: "Sucursal Zona 10" },
-    { id: 3, name: "Bodega Fraijanes", location: "Carretera a El Salvador, Fraijanes", capacity: "1200 m²", manager: "Carlos Solórzano", branch: "Sucursal Central" },
+    { id: 1, name: "Bodega Principal / Sala de Ventas", location: "Tacaná, San Marcos", capacity: "1500 m²", manager: "Melvin René González", branch: "Casa Matriz - Ferretería González (Tacaná)" },
+    { id: 2, name: "Bodega Secundaria / Material Pesado", location: "Tacaná, San Marcos", capacity: "2500 m²", manager: "Seyler González", branch: "Casa Matriz - Ferretería González (Tacaná)" },
   ],
   taxes: [
     { id: 1, name: 'IVA', rate: 12 },
     { id: 2, name: 'Exento', rate: 0 },
   ],
   productFamilies: [
-    { id: 1, name: 'Herramientas Manuales' },
-    { id: 2, name: 'Materiales de Construcción' },
-    { id: 3, name: 'Tornillería' },
-    { id: 4, name: 'Fontanería' },
-    { id: 5, name: 'Electricidad' },
-    { id: 6, name: 'Servicios' },
+    { id: 1, name: 'FERRETERIA' },
+    { id: 2, name: 'CARPINTERIA' },
+    { id: 3, name: 'PERFILES' },
+    { id: 4, name: 'CONSTRUCCION' },
+    { id: 5, name: 'HOGAR' },
+    { id: 6, name: 'AUTOMOTRIZ' },
+    { id: 7, name: 'ELECTRICIDAD' },
+    { id: 8, name: 'PISOS' },
+    { id: 9, name: 'REMODELACION' },
+    { id: 10, name: 'PINTURA' },
   ],
   drivers: [
     { id: 1, name: 'Pedro Morales', license: 'GU-123456' },
@@ -208,9 +208,32 @@ const initialSettings: Settings = {
 
 // --- IN-MEMORY DATA STORE ---
 const SETTINGS_KEY = 'settings';
-let memorySettings: Settings = loadStore<Settings>(SETTINGS_KEY, initialSettings);
+
+function sanitizeSettings(settings: Settings): Settings {
+  if (!settings) return JSON.parse(JSON.stringify(initialSettings));
+  const hasLegacyMock = settings.branches?.some(b => 
+    b.name.includes("Sucursal Central") || b.name.includes("Zona 10")
+  ) || settings.warehouses?.some(w => 
+    w.name.includes("Almacén Central") || w.name.includes("Fraijanes")
+  );
+
+  if (hasLegacyMock || !settings.branches || settings.branches.length === 0) {
+    settings.branches = JSON.parse(JSON.stringify(initialSettings.branches));
+    settings.warehouses = JSON.parse(JSON.stringify(initialSettings.warehouses));
+    settings.documentSeries = JSON.parse(JSON.stringify(initialSettings.documentSeries));
+    settings.posTerminals = JSON.parse(JSON.stringify(initialSettings.posTerminals));
+    settings.companyInfo = JSON.parse(JSON.stringify(initialSettings.companyInfo));
+    settings.priceTiers = JSON.parse(JSON.stringify(initialSettings.priceTiers));
+    settings.productFamilies = JSON.parse(JSON.stringify(initialSettings.productFamilies));
+    saveStore(SETTINGS_KEY, settings);
+  }
+  return settings;
+}
+
+let memorySettings: Settings = sanitizeSettings(loadStore<Settings>(SETTINGS_KEY, initialSettings));
 
 export async function getSettings(): Promise<Settings> {
+    memorySettings = sanitizeSettings(memorySettings);
     return JSON.parse(JSON.stringify(memorySettings));
 }
 
@@ -231,6 +254,24 @@ export async function saveCompanyInfo(companyInfo: CompanyInfo): Promise<void> {
 }
 
 export async function getBranches(): Promise<Branch[]> {
+  try {
+    if (typeof window !== 'undefined') {
+      const res = await fetch('/api/branches');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          return data.items.map((b: any) => ({
+            id: b.id,
+            name: b.name,
+            address: b.address || '',
+            logoUrl: '',
+          }));
+        }
+      }
+    }
+  } catch {
+    // fallback to stored settings
+  }
   const settings = await getSettings();
   return settings.branches;
 }
@@ -286,8 +327,28 @@ export async function savePosTerminals(posTerminals: PosTerminal[]): Promise<voi
 }
 
 export async function getWarehouses(): Promise<Warehouse[]> {
-    const settings = await getSettings();
-    return settings.warehouses;
+  try {
+    if (typeof window !== 'undefined') {
+      const res = await fetch('/api/warehouses');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          return data.items.map((w: any) => ({
+            id: w.id,
+            name: w.name,
+            location: w.location || 'Tacaná, San Marcos',
+            capacity: w.capacity || '2000 m²',
+            manager: w.manager || 'Melvin René González',
+            branch: w.branch || 'Casa Matriz - Ferretería González (Tacaná)',
+          }));
+        }
+      }
+    }
+  } catch {
+    // fallback to stored settings
+  }
+  const settings = await getSettings();
+  return settings.warehouses;
 }
 
 export async function saveWarehouses(warehouses: Warehouse[]): Promise<void> {
