@@ -1075,108 +1075,110 @@ function TPVContent() {
                     </div>
                  </div>
               </div>
-              <ScrollArea className="flex-grow">
-                 <div className="p-4">
-                 {productViewMode === 'grid' ? (
+              {productViewMode === 'grid' ? (
+                <ScrollArea className="flex-grow">
+                  <div className="p-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {filteredProducts.map(product => {
-                            const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
-                            const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
-                            const hasStock = product.isService || availableForSale > 0;
+                      {filteredProducts.map(product => {
+                        const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
+                        const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
+                        const hasStock = product.isService || availableForSale > 0;
 
-                            return (
-                                <Card
-                                    key={product.id} 
-                                    onClick={() => handleAddToCart(product)} 
-                                    className={cn(
-                                        "p-3 flex flex-col justify-between transition-all group rounded-2xl border-border/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)]",
-                                        "cursor-pointer hover:shadow-md hover:border-primary",
-                                        !hasStock && "opacity-50"
-                                    )}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <p className="text-sm font-semibold leading-tight flex-grow pr-2">{product.name}</p>
-                                        <div className="flex-shrink-0 flex items-center">
-                                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => handleOpenReservationModal(product, e)}>
-                                                <HardHat className="h-4 w-4"/>
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => handleShowProductDetail(product, e)}>
-                                                <Info className="h-4 w-4"/>
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-end mt-auto pt-2 border-t">
-                                        <div className="text-xs">
-                                            <div className="font-mono text-muted-foreground">{product.codes.find(c => c.type === 'SKU')?.value}</div>
-                                            {product.isService ? (
-                                                <div className="font-semibold text-sky-600">Servicio</div>
-                                            ) : (
-                                                <>
-                                                    <div className={cn("font-semibold", !hasStock && "text-destructive")}>Disp: {availableForSale}</div>
-                                                    {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
-                                                </>
-                                            )}
-                                        </div>
-                                        <span className="text-sm font-bold text-primary">Q{(product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0).toFixed(2)}</span>
-                                    </div>
-                                </Card>
-                            );
-                        })}
+                        return (
+                          <Card
+                            key={product.id} 
+                            onClick={() => handleAddToCart(product)} 
+                            className={cn(
+                              "p-3 flex flex-col justify-between transition-all group rounded-2xl border-border/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)]",
+                              "cursor-pointer hover:shadow-md hover:border-primary",
+                              !hasStock && "opacity-50"
+                            )}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="text-sm font-semibold leading-tight flex-grow pr-2">{product.name}</p>
+                              <div className="flex-shrink-0 flex items-center">
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => handleOpenReservationModal(product, e)}>
+                                  <HardHat className="h-4 w-4"/>
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => handleShowProductDetail(product, e)}>
+                                  <Info className="h-4 w-4"/>
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-end mt-auto pt-2 border-t">
+                              <div className="text-xs">
+                                <div className="font-mono text-muted-foreground">{product.codes.find(c => c.type === 'SKU')?.value}</div>
+                                {product.isService ? (
+                                  <div className="font-semibold text-sky-600">Servicio</div>
+                                ) : (
+                                  <>
+                                    <div className={cn("font-semibold", !hasStock && "text-destructive")}>Disp: {availableForSale}</div>
+                                    {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
+                                  </>
+                                )}
+                              </div>
+                              <span className="text-sm font-bold text-primary">Q{(product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0).toFixed(2)}</span>
+                            </div>
+                          </Card>
+                        );
+                      })}
                     </div>
-                 ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Producto</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Disp.</TableHead>
-                          <TableHead>Otras Suc.</TableHead>
-                          <TableHead className="text-right">Precio</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map(product => {
-                          const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
-                          const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
-                          const price = (product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0);
-                          const stockInOtherWarehouses = product.stock
-                            .filter(s => s.warehouseId.toString() !== selectedWarehouseId)
-                            .reduce((sum, s) => sum + s.quantity, 0);
-                          const otherWarehousesStockDetails = product.stock
-                            .filter(s => s.warehouseId.toString() !== selectedWarehouseId && s.quantity > 0)
-                            .map(s => `${s.warehouseName}: ${s.quantity}`)
-                            .join('\n');
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="flex-grow overflow-y-auto min-h-0">
+                  <Table containerClassName="overflow-visible">
+                    <TableHeader className="sticky top-0 z-20 bg-card">
+                      <TableRow className="hover:bg-transparent border-b">
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">Producto</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">SKU</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">Disp.</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">Otras Suc.</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground text-right shadow-[0_1px_0_0_hsl(var(--border))]">Precio</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.map(product => {
+                        const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
+                        const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
+                        const price = (product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0);
+                        const stockInOtherWarehouses = product.stock
+                          .filter(s => s.warehouseId.toString() !== selectedWarehouseId)
+                          .reduce((sum, s) => sum + s.quantity, 0);
+                        const otherWarehousesStockDetails = product.stock
+                          .filter(s => s.warehouseId.toString() !== selectedWarehouseId && s.quantity > 0)
+                          .map(s => `${s.warehouseName}: ${s.quantity}`)
+                          .join('\n');
 
-                          return (
-                            <TableRow key={product.id} onClick={() => handleAddToCart(product)} className={cn("cursor-pointer")}>
-                              <TableCell className="font-medium">{product.name}</TableCell>
-                              <TableCell className="font-mono text-xs">{product.codes.find(c => c.type === 'SKU')?.value}</TableCell>
-                              <TableCell className="font-semibold">{product.isService ? 'N/A' : availableForSale}</TableCell>
-                              <TableCell>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className={cn(stockInOtherWarehouses > 0 ? "font-semibold text-blue-600" : "text-muted-foreground")}>
-                                              {product.isService ? 'N/A' : stockInOtherWarehouses}
-                                            </span>
-                                        </TooltipTrigger>
-                                        {otherWarehousesStockDetails && (
-                                            <TooltipContent>
-                                                <pre className="text-xs">{otherWarehousesStockDetails}</pre>
-                                            </TooltipContent>
-                                        )}
-                                    </Tooltip>
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell className="text-right font-bold text-primary">Q{price.toFixed(2)}</TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                 )}
-                 </div>
-               </ScrollArea>
+                        return (
+                          <TableRow key={product.id} onClick={() => handleAddToCart(product)} className={cn("cursor-pointer")}>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell className="font-mono text-xs">{product.codes.find(c => c.type === 'SKU')?.value}</TableCell>
+                            <TableCell className="font-semibold">{product.isService ? 'N/A' : availableForSale}</TableCell>
+                            <TableCell>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className={cn(stockInOtherWarehouses > 0 ? "font-semibold text-blue-600" : "text-muted-foreground")}>
+                                      {product.isService ? 'N/A' : stockInOtherWarehouses}
+                                    </span>
+                                  </TooltipTrigger>
+                                  {otherWarehousesStockDetails && (
+                                    <TooltipContent>
+                                      <pre className="text-xs">{otherWarehousesStockDetails}</pre>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary">Q{price.toFixed(2)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </Card>
           </ResizablePanel>
           <ResizableHandle withHandle />
