@@ -22,6 +22,7 @@ model Branch {
   isMain      Boolean     @default(false)
   warehouses  Warehouse[]
   invoices    Invoice[]
+  users       User[]
   transfersFrom StockTransfer[] @relation("TransferOrigin")
   transfersTo   StockTransfer[] @relation("TransferDest")
   createdAt   DateTime    @default(now())
@@ -182,4 +183,24 @@ model StockTransfer {
   notes          String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+// ----------------------------------------------------
+// 5. USUARIOS, ROLES Y ACCESOS POR SUCURSAL
+// ----------------------------------------------------
+
+model User {
+  id        String   @id
+  username  String   @unique
+  name      String
+  email     String   @unique
+  role      String   // "Admin", "Gerente General", "Gerente de Ventas", "Vendedor", "Contable", "Digitador de Compras", "Bodeguero"
+  branchId  String   @default("branch-matriz")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  pin       String   @default("1234")
+  password  String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId])
 }

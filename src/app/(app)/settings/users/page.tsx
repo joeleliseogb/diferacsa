@@ -143,6 +143,7 @@ export default function UsersPage() {
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Email</TableHead>
+                                <TableHead>Sucursal</TableHead>
                                 <TableHead>Rol</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
@@ -153,6 +154,7 @@ export default function UsersPage() {
                                     <TableRow key={i}>
                                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                         <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                                     </TableRow>
@@ -161,7 +163,8 @@ export default function UsersPage() {
                                 <TableRow key={user.id}>
                                     <TableCell className="font-medium">{user.name}</TableCell>
                                     <TableCell>{user.email}</TableCell>
-                                    <TableCell>{user.role}</TableCell>
+                                    <TableCell><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">{user.branchName || 'Casa Matriz'}</span></TableCell>
+                                    <TableCell><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground">{user.role}</span></TableCell>
                                     <TableCell className="text-right space-x-1">
                                         <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
                                             <Pencil className="h-4 w-4" />
