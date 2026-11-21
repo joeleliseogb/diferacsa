@@ -56,6 +56,7 @@ export interface Product {
   images: ProductImage[];
   stock: ProductStock[];
   reservedStock?: number;
+  salesCount?: number;
   prices: ProductPrice[];
   tax: {
     id: number;

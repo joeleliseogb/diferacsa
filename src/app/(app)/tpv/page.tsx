@@ -3,6 +3,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardFooter, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2, ShoppingCart, Package } from "lucide-react";
+import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2, ShoppingCart, Package, Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Customer, Order, Quote, Purchase, OrderProduct, QuoteProduct, Address, PaymentMethod, PriceTier, PurchaseProduct, ProductFamily, Tax, Reservation } from "@/lib/servicios";
 import type { Product } from "@/lib/product-data";
@@ -145,6 +146,11 @@ function TPVContent() {
   const [productViewMode, setProductViewMode] = useState<ProductView>('grid');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
   const [isCompactScreen, setIsCompactScreen] = useState(false);
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalNode(document.getElementById('tpv-top-actions'));
+  }, []);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -389,7 +395,7 @@ function TPVContent() {
   // Búsqueda en tiempo real contra la base de datos completa (9,479 productos)
   useEffect(() => {
     const handler = setTimeout(async () => {
-      if (searchTerm.trim().length >= 2) {
+      if (searchTerm.trim().length >= 1) {
         const { getProducts } = await import('@/lib/servicios');
         const searchResults = await getProducts(searchTerm.trim());
         setProducts(prev => {
@@ -398,7 +404,7 @@ function TPVContent() {
           return Array.from(map.values());
         });
       }
-    }, 200);
+    }, 180);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
@@ -487,12 +493,55 @@ function TPVContent() {
   }, [historyDialogOpen, selectedCustomerId]);
 
   const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products.slice(0, 50); // Show first 50 products by default
-    return products.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.codes.some(c => c.value.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [products, searchTerm]);
+    const term = searchTerm.trim().toLowerCase();
+
+    // REGLA 1: Cuando NO se haya buscado ningún producto, mostrar los productos más vendidos
+    if (!term) {
+      return [...products].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+    }
+
+    // REGLA 2: Al buscar, filtrar coincidencias por nombre, SKU o código de barras
+    const tokens = term.split(/\s+/).filter(Boolean);
+    const matches = products.filter(p => {
+      const name = p.name.toLowerCase();
+      const sku = (p.codes.find(c => c.type === 'SKU')?.value || '').toLowerCase();
+      const barcode = (p.codes.find(c => c.type === 'EAN')?.value || '').toLowerCase();
+      const text = `${name} ${sku} ${barcode}`;
+      return tokens.every(token => text.includes(token));
+    });
+
+    // Clasificar en los 3 niveles de prioridad solicitados:
+    // 1. Primero: Productos que tienen existencia en la sucursal/bodega seleccionada actual
+    // 2. Segundo: Productos con existencia en otras sucursales/bodegas
+    // 3. Por último: Productos sin existencia en ninguna bodega
+    const getStockTier = (p: Product): number => {
+      if (p.isService) return 1;
+
+      const currentWhStock = (p.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0) - (p.reservedStock || 0);
+      if (currentWhStock > 0) return 1;
+
+      const otherWhStock = p.stock
+        .filter(s => s.warehouseId.toString() !== selectedWarehouseId)
+        .reduce((sum, s) => sum + s.quantity, 0);
+      if (otherWhStock > 0) return 2;
+
+      return 3;
+    };
+
+    return matches.sort((a, b) => {
+      const tierA = getStockTier(a);
+      const tierB = getStockTier(b);
+      if (tierA !== tierB) {
+        return tierA - tierB; // 1 antes que 2, y 2 antes que 3
+      }
+
+      // Dentro del mismo nivel de existencia, los más vendidos primero:
+      const salesDiff = (b.salesCount || 0) - (a.salesCount || 0);
+      if (salesDiff !== 0) return salesDiff;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [products, searchTerm, selectedWarehouseId]);
 
   const filteredCustomersForSearch = useMemo(() => {
     return customers.filter(c => c.id !== '0');
@@ -1134,6 +1183,22 @@ function TPVContent() {
                         </div>
                     </div>
                  </div>
+                 {/* Indicador de orden del catálogo */}
+                 <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-2 text-muted-foreground">
+                   {!searchTerm.trim() ? (
+                     <span className="inline-flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full">
+                       <Flame className="h-3 w-3" />
+                       Catálogo: Productos más vendidos
+                     </span>
+                   ) : (
+                     <span className="inline-flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300 bg-muted/60 px-2 py-0.5 rounded-full text-[10.5px]">
+                       Resultados: 1º En bodega • 2º Otras sucursales • 3º Sin stock
+                     </span>
+                   )}
+                   <span className="font-mono text-[10.5px] text-muted-foreground/80">
+                     {filteredProducts.length} artículo{filteredProducts.length === 1 ? '' : 's'}
+                   </span>
+                 </div>
               </div>
               {productViewMode === 'grid' ? (
                 <ScrollArea className="flex-grow">
@@ -1142,6 +1207,7 @@ function TPVContent() {
                       {filteredProducts.map(product => {
                         const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
                         const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
+                        const stockInOtherWarehouses = product.stock.filter(s => s.warehouseId.toString() !== selectedWarehouseId).reduce((sum, s) => sum + s.quantity, 0);
                         const hasStock = product.isService || availableForSale > 0;
 
                         return (
@@ -1151,7 +1217,7 @@ function TPVContent() {
                             className={cn(
                               "p-3 flex flex-col justify-between transition-all group rounded-2xl border-border/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)]",
                               "cursor-pointer hover:shadow-md hover:border-primary",
-                              !hasStock && "opacity-50"
+                              !hasStock && (stockInOtherWarehouses > 0 ? "opacity-80 border-amber-500/30" : "opacity-45")
                             )}
                           >
                             <div className="flex justify-between items-start mb-2">
@@ -1171,14 +1237,24 @@ function TPVContent() {
                                   <div className="font-mono text-muted-foreground">{product.codes.find(c => c.type === 'SKU')?.value}</div>
                                   {product.isService ? (
                                     <div className="font-semibold text-sky-600">Servicio</div>
-                                  ) : (
+                                  ) : availableForSale > 0 ? (
                                     <>
-                                      <div className={cn("font-semibold flex items-center gap-1.5", !hasStock && "text-destructive")}>
+                                      <div className="font-semibold flex items-center gap-1.5 text-foreground">
                                         <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getWarehouseConfig(selectedWarehouseId).dot)} />
                                         <span>Disp: {availableForSale}</span>
                                       </div>
                                       {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
                                     </>
+                                  ) : stockInOtherWarehouses > 0 ? (
+                                    <div className="font-medium flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[10.5px]" title={`Sin existencia en esta bodega. Disponible en otras sucursales: ${stockInOtherWarehouses}`}>
+                                      <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500" />
+                                      <span>Otras suc: {stockInOtherWarehouses}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="font-semibold flex items-center gap-1 text-destructive text-[10.5px]">
+                                      <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-destructive" />
+                                      <span>Agotado</span>
+                                    </div>
                                   )}
                                 </div>
                                 <div className="text-right">
@@ -1722,150 +1798,184 @@ function TPVContent() {
 
 
 
+  const tpvTopActionsContent = (
+    <TooltipProvider delayDuration={100}>
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        {/* Selector de Sucursal Colapsado */}
+        {(() => {
+          const currentBranch = branches.find(b => b.id.toString() === selectedBranchId);
+          const brConfig = getBranchConfig(currentBranch?.id || currentBranch?.name);
+          const BrIcon = brConfig.Icon;
+          return (
+            <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SelectTrigger className="h-8 px-2 rounded-xl border border-border/70 bg-card hover:bg-muted/60 text-foreground shadow-none transition-all duration-200 flex items-center gap-1.5 group cursor-pointer focus:ring-1 focus:ring-primary/40 [&>svg:last-child]:hidden">
+                    <span className={cn("w-2 h-2 rounded-full shrink-0", brConfig.dot)} />
+                    <BrIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                    <span className="hidden group-hover:inline-block max-w-0 group-hover:max-w-[130px] overflow-hidden whitespace-nowrap transition-all duration-200 text-xs font-semibold">
+                      {brConfig.shortName}
+                    </span>
+                  </SelectTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <span className="font-semibold">Sucursal:</span> {currentBranch?.name || brConfig.shortName}
+                </TooltipContent>
+              </Tooltip>
+              <SelectContent>
+                {branches.map(b => {
+                  const bConf = getBranchConfig(b.id || b.name);
+                  const BIcon = bConf.Icon;
+                  return (
+                    <SelectItem key={b.id} value={b.id.toString()} className="cursor-pointer">
+                      <div className="flex items-center gap-2 py-0.5">
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", bConf.dot)} />
+                        <BIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <div className="flex flex-col text-left">
+                          <span className="font-semibold text-xs">{bConf.shortName}</span>
+                          <span className="text-[10px] text-muted-foreground">{b.name}</span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          );
+        })()}
+
+        {/* Selector de Bodega Colapsado */}
+        {(() => {
+          const currentWh = filteredWarehouses.find(w => w.id.toString() === selectedWarehouseId);
+          const whConfig = getWarehouseConfig(currentWh?.id || currentWh?.name);
+          const WhIcon = whConfig.Icon;
+          return (
+            <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SelectTrigger className="h-8 px-2 rounded-xl border border-border/70 bg-card hover:bg-muted/60 text-foreground shadow-none transition-all duration-200 flex items-center gap-1.5 group cursor-pointer focus:ring-1 focus:ring-primary/40 [&>svg:last-child]:hidden">
+                    <span className={cn("w-2 h-2 rounded-full shrink-0", whConfig.dot)} />
+                    <WhIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                    <span className="hidden group-hover:inline-block max-w-0 group-hover:max-w-[150px] overflow-hidden whitespace-nowrap transition-all duration-200 text-xs font-semibold">
+                      {whConfig.code}: {whConfig.shortName}
+                    </span>
+                  </SelectTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <span className="font-semibold">Bodega:</span> {currentWh?.name || whConfig.shortName}
+                </TooltipContent>
+              </Tooltip>
+              <SelectContent>
+                {filteredWarehouses.map(w => {
+                  const wConf = getWarehouseConfig(w.id || w.name);
+                  const WIcon = wConf.Icon;
+                  return (
+                    <SelectItem key={w.id} value={w.id.toString()} className="cursor-pointer">
+                      <div className="flex items-center gap-2 py-0.5">
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", wConf.dot)} />
+                        <WIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <div className="flex flex-col text-left">
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn("px-1 py-0.2 rounded text-[9px] font-bold border", wConf.badgeClass)}>
+                              {wConf.code}
+                            </span>
+                            <span className="font-semibold text-xs">{wConf.shortName}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{w.name}</span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          );
+        })()}
+
+        {/* Ventas Aparcadas Colapsado */}
+        <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 rounded-xl border border-border/70 bg-card hover:bg-muted/60 text-foreground shadow-none transition-all duration-200 flex items-center gap-1.5 group cursor-pointer"
+                >
+                  <FolderClock className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                  {parkedSales.length > 0 && (
+                    <span className="flex h-3.5 min-w-[14px] px-1 items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold">
+                      {parkedSales.length}
+                    </span>
+                  )}
+                  <span className="hidden group-hover:inline-block max-w-0 group-hover:max-w-[110px] overflow-hidden whitespace-nowrap transition-all duration-200 text-xs font-semibold">
+                    Aparcadas {parkedSales.length > 0 ? `(${parkedSales.length})` : ''}
+                  </span>
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              <span className="font-semibold">Ventas Aparcadas:</span> {parkedSales.length} guardadas
+            </TooltipContent>
+          </Tooltip>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ventas Aparcadas</DialogTitle>
+              <DialogDescription>Selecciona una venta para retomarla.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <ScrollArea className="h-64">
+                <Table>
+                  <TableHeader>
+                    <TableRow><TableHead>Cliente</TableHead><TableHead>Vendedor</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Acción</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parkedSales.length > 0 ? parkedSales.map(sale => (
+                      <TableRow key={sale.id}>
+                        <TableCell className="font-medium">{sale.customerName}</TableCell>
+                        <TableCell>{sale.salespersonName}</TableCell>
+                        <TableCell className="text-right">Q{sale.total.toFixed(2)}</TableCell>
+                        <TableCell className="text-right"><Button size="sm" onClick={() => handleResumeSale(sale)}>Retomar</Button></TableCell>
+                      </TableRow>
+                    )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay ventas aparcadas.</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Terminal Colapsado */}
+        <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SelectTrigger className="h-8 px-2 rounded-xl border border-border/70 bg-card hover:bg-muted/60 text-foreground shadow-none transition-all duration-200 flex items-center gap-1.5 group cursor-pointer focus:ring-1 focus:ring-primary/40 [&>svg:last-child]:hidden">
+                <Terminal className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                <span className="hidden group-hover:inline-block max-w-0 group-hover:max-w-[120px] overflow-hidden whitespace-nowrap transition-all duration-200 text-xs font-semibold">
+                  {filteredTerminals.find(t => t.id.toString() === selectedTerminalId)?.name || 'Terminal'}
+                </span>
+              </SelectTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              <span className="font-semibold">Terminal:</span> {filteredTerminals.find(t => t.id.toString() === selectedTerminalId)?.name || 'Terminal Principal'}
+            </TooltipContent>
+          </Tooltip>
+          <SelectContent>
+            {filteredTerminals.map(t => (
+              <SelectItem key={t.id} value={t.id.toString()} className="cursor-pointer">
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </TooltipProvider>
+  );
+
   return (
     <>
-    <div className="flex flex-col gap-4 h-full">
-      <header className="flex-shrink-0 border-b pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-                {companyInfo?.logoUrl ? (
-                    <Image src={companyInfo.logoUrl} alt={companyInfo.name} width={40} height={40} className="rounded-md object-contain" />
-                ) : (
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-primary text-primary-foreground font-bold text-xl font-headline rounded-md">
-                        {companyInfo?.name.charAt(0) || 'S'}
-                    </div>
-                )}
-                <div>
-                    <h1 className="text-xl font-bold font-headline tracking-tight">{companyInfo?.name || 'SimplyGest'}</h1>
-                    <span className="font-mono text-sm text-muted-foreground">{nextInvoiceId}</span>
-                </div>
-            </div>
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto justify-end">
-                {(() => {
-                  const currentBranch = branches.find(b => b.id.toString() === selectedBranchId);
-                  const brConfig = getBranchConfig(currentBranch?.id || currentBranch?.name);
-                  const BrIcon = brConfig.Icon;
-                  return (
-                    <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                        <SelectTrigger className={cn(
-                            "h-9 px-2.5 sm:px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all w-full sm:w-auto min-w-0 sm:min-w-[160px] sm:max-w-[220px]",
-                            brConfig.bg, brConfig.text, brConfig.border
-                        )}>
-                            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
-                                <span className={cn("w-2 h-2 rounded-full shrink-0", brConfig.dot)} />
-                                <BrIcon className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate font-semibold">{brConfig.shortName}</span>
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {branches.map(b => {
-                                const bConf = getBranchConfig(b.id || b.name);
-                                const BIcon = bConf.Icon;
-                                return (
-                                    <SelectItem key={b.id} value={b.id.toString()} className="cursor-pointer">
-                                        <div className="flex items-center gap-2 py-0.5">
-                                            <span className={cn("w-2 h-2 rounded-full shrink-0", bConf.dot)} />
-                                            <BIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                            <div className="flex flex-col text-left">
-                                                <span className="font-semibold text-xs">{bConf.shortName}</span>
-                                                <span className="text-[10px] text-muted-foreground">{b.name}</span>
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                  );
-                })()}
-
-                {(() => {
-                  const currentWh = filteredWarehouses.find(w => w.id.toString() === selectedWarehouseId);
-                  const whConfig = getWarehouseConfig(currentWh?.id || currentWh?.name);
-                  const WhIcon = whConfig.Icon;
-                  return (
-                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
-                        <SelectTrigger className={cn(
-                            "h-9 px-2.5 sm:px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all w-full sm:w-auto min-w-0 sm:min-w-[175px] sm:max-w-[240px]",
-                            whConfig.bg, whConfig.text, whConfig.border
-                        )}>
-                            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
-                                <span className={cn("w-2 h-2 rounded-full shrink-0", whConfig.dot)} />
-                                <WhIcon className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate font-semibold">{whConfig.code}: {whConfig.shortName}</span>
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {filteredWarehouses.map(w => {
-                                const wConf = getWarehouseConfig(w.id || w.name);
-                                const WIcon = wConf.Icon;
-                                return (
-                                    <SelectItem key={w.id} value={w.id.toString()} className="cursor-pointer">
-                                        <div className="flex items-center gap-2 py-0.5">
-                                            <span className={cn("w-2 h-2 rounded-full shrink-0", wConf.dot)} />
-                                            <WIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                            <div className="flex flex-col text-left">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className={cn("px-1 py-0.2 rounded text-[9px] font-bold border", wConf.badgeClass)}>
-                                                        {wConf.code}
-                                                    </span>
-                                                    <span className="font-semibold text-xs">{wConf.shortName}</span>
-                                                </div>
-                                                <span className="text-[10px] text-muted-foreground">{w.name}</span>
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                  );
-                })()}
-                 <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" className="rounded-xl border-border/80 shadow-xs relative w-full sm:w-auto h-9 px-2.5 text-xs truncate justify-center">
-                           <FolderClock className="mr-1.5 h-3.5 w-3.5 shrink-0" /> 
-                           <span className="truncate">Aparcadas {parkedSales.length > 0 && `(${parkedSales.length})`}</span>
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Ventas Aparcadas</DialogTitle>
-                            <DialogDescription>Selecciona una venta para retomarla.</DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <ScrollArea className="h-64">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow><TableHead>Cliente</TableHead><TableHead>Vendedor</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Acción</TableHead></TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {parkedSales.length > 0 ? parkedSales.map(sale => (
-                                            <TableRow key={sale.id}>
-                                                <TableCell className="font-medium">{sale.customerName}</TableCell>
-                                                <TableCell>{sale.salespersonName}</TableCell>
-                                                <TableCell className="text-right">Q{sale.total.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right"><Button size="sm" onClick={() => handleResumeSale(sale)}>Retomar</Button></TableCell>
-                                            </TableRow>
-                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay ventas aparcadas.</TableCell></TableRow>}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-                <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="w-full sm:w-auto min-w-0 sm:min-w-[150px] sm:max-w-[200px] h-9 rounded-xl border-border/80 shadow-xs text-xs px-2.5">
-                        <div className="flex items-center gap-1.5 truncate">
-                            <Terminal className="h-3.5 w-3.5 shrink-0" />
-                            <SelectValue placeholder="Terminal..." />
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent>{filteredTerminals.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
-        </div>
-      </header>
+    {portalNode && createPortal(tpvTopActionsContent, portalNode)}
+    <div className="flex flex-col h-full min-h-0">
       <main className="flex-grow min-h-0 flex flex-col">
         {isCompactScreen ? (
           <div className="flex flex-col h-full gap-2.5">

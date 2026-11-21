@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : (page - 1) * limit;
     const categoryId = searchParams.get('categoryId');
     const stockStatus = searchParams.get('stockStatus'); // 'all', 'in_stock', 'low_stock', 'out_of_stock'
-    const sortBy = searchParams.get('sortBy') || 'name_asc';
+    const sortBy = searchParams.get('sortBy');
 
     const whereClause: any = {};
 
@@ -119,7 +119,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const orderBy: any = sortBy === 'name_desc' ? { name: 'desc' } : { name: 'asc' };
+    let orderBy: any;
+    if (sortBy === 'name_asc') {
+      orderBy = { name: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { name: 'desc' };
+    } else {
+      // Por defecto (y cuando no se especifica): ordenar por productos más vendidos (salesCount DESC)
+      orderBy = [{ salesCount: 'desc' }, { name: 'asc' }];
+    }
 
     const [productsRes, countRes, totalStock, categories] = await Promise.all([
       prisma.product.findMany({
@@ -198,6 +206,7 @@ function formatProducts(dbProducts: any[]): Product[] {
       name: p.name,
       description: p.description || p.name,
       isService: p.isService,
+      salesCount: p.salesCount ?? 0,
       codes: [
         { id: 1, type: 'SKU', value: p.sku },
         { id: 2, type: 'EAN', value: p.barcode || p.sku },

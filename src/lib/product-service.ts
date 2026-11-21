@@ -85,8 +85,8 @@ export async function getProducts_server(): Promise<Product[]> {
 export async function getProducts(searchTerm?: string): Promise<Product[]> {
     try {
         const url = typeof window !== 'undefined' 
-            ? `/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=100` 
-            : `http://localhost:9002/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=100`;
+            ? `/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200` 
+            : `http://localhost:9002/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200`;
         const res = await fetch(url);
         if (res.ok) {
             const data = await res.json();

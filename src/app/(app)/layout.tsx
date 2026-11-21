@@ -167,23 +167,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex flex-col h-svh">
               {/* Header Superior Blanco (Idéntico a la cabecera de theme.jpeg) */}
               <header className="sticky top-0 z-20 px-4 lg:px-8 py-2.5 flex items-center justify-between gap-4 bg-card border-b border-border/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                {/* Lado Izquierdo: Trigger + Título de sección + Buscador ovalado */}
-                <div className="flex items-center gap-4 flex-1 max-w-lg">
-                  <SidebarTrigger className="h-9 w-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground" />
+                {/* Lado Izquierdo: Trigger + Título de sección / Empresa + Buscador */}
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 max-w-xl">
+                  <SidebarTrigger className="h-9 w-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground shrink-0" />
                   
-                  {/* Título de la página actual */}
-                  <span className="font-headline font-bold text-base text-foreground hidden sm:inline-block">
-                    {getPageTitle()}
-                  </span>
+                  {/* Título de la página actual / Empresa en TPV */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-headline font-bold text-sm sm:text-base text-foreground">
+                      {isSpecialView ? 'Ferretería González' : getPageTitle()}
+                    </span>
+                    {isSpecialView && (
+                      <span className="font-mono text-[10.5px] font-semibold text-muted-foreground bg-muted/80 dark:bg-muted/50 px-1.5 py-0.5 rounded border border-border/60 shrink-0">
+                        FACA-1251
+                      </span>
+                    )}
+                  </div>
 
                   {/* Buscador global interactivo y command palette */}
-                  <div className="relative w-full max-w-xs">
+                  <div className="relative w-full max-w-xs hidden sm:block">
                     <GlobalSearch />
                   </div>
                 </div>
 
-                {/* Lado Derecho: Toggle modo oscuro, Notificaciones, Calculadora y Chip de Usuario */}
-                <div className="flex items-center gap-2 sm:gap-3">
+                {/* Lado Derecho: Acciones TPV, Toggle modo oscuro, Notificaciones, Calculadora y Chip de Usuario */}
+                <div className="flex items-center gap-1.5 sm:gap-2.5">
+                  {/* Slot dinámico para las acciones colapsadas del TPV (Sucursal, Bodega, Aparcadas, Terminal) */}
+                  <div id="tpv-top-actions" className="flex items-center gap-1 sm:gap-1.5" />
+
                   <ThemeToggle />
 
                   <NotificationsPanel />
@@ -262,7 +272,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {/* Contenido de la página */}
               <main className={cn(
                 "flex-1 overflow-y-auto overflow-x-hidden",
-                isSpecialView ? "p-2 sm:p-4 lg:p-6" : "p-4 sm:p-6 lg:p-7"
+                isSpecialView ? "p-2 sm:p-2.5 lg:p-3" : "p-4 sm:p-6 lg:p-7"
               )}>
                 {children}
               </main>

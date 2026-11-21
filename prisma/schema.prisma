@@ -63,6 +63,7 @@ model Product {
   category    Category?      @relation(fields: [categoryId], references: [id])
   taxRate     Float          @default(0.12)
   isService   Boolean        @default(false)
+  salesCount  Float          @default(0)
   stocks      ProductStock[]
   prices      ProductPrice[]
   createdAt   DateTime       @default(now())
@@ -70,6 +71,7 @@ model Product {
 
   @@index([sku])
   @@index([name])
+  @@index([salesCount])
 }
 
 model ProductStock {
@@ -171,6 +173,9 @@ model InvoiceItem {
   price      Float
   total      Float
   discount   Float    @default(0)
+
+  @@index([productId])
+  @@index([invoiceId])
 }
 
 model StockTransfer {
