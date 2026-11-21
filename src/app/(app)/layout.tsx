@@ -76,7 +76,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Obtener nombre de la sección actual para el breadcrumb del header
   const getPageTitle = () => {
-    if (pathname === '/dashboard') return 'Dasbor';
+    if (pathname === '/dashboard') return 'Dashboard';
     if (pathname === '/workflow') return 'Flujo Operativo';
     if (pathname.startsWith('/tpv')) return 'Punto de Venta';
     if (pathname.startsWith('/customers')) return 'Clientes';
