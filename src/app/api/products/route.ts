@@ -30,10 +30,11 @@ export async function GET(request: NextRequest) {
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : (page - 1) * limit;
     const categoryId = searchParams.get('categoryId');
     const stockStatus = searchParams.get('stockStatus'); // 'all', 'in_stock', 'low_stock', 'out_of_stock'
+    const sortBy = searchParams.get('sortBy') || 'name_asc';
 
     const whereClause: any = {};
 
-    // Búsqueda inteligente multi-palabra (ej. "tubo 1/2" busca que contenga ambos términos)
+    // Búsqueda inteligente multi-palabra
     const trimmed = search.trim();
     if (trimmed) {
       const tokens = trimmed.split(/\s+/).filter(Boolean);
@@ -73,7 +74,54 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const [dbProducts, total, totalStock, categories] = await Promise.all([
+    let dbProducts: any[] = [];
+    let total = 0;
+
+    if (sortBy === 'stock_desc' && !search && (!categoryId || categoryId === 'all') && (!stockStatus || stockStatus === 'all')) {
+      const [topStocks, count, totalStk, cats] = await Promise.all([
+        prisma.productStock.findMany({
+          select: { productId: true },
+          orderBy: { quantity: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.product.count(),
+        getCachedTotalStock(),
+        prisma.category.findMany({ orderBy: { name: 'asc' } }),
+      ]);
+      total = count;
+      const ids = topStocks.map(s => s.productId);
+      const prods = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        include: { category: true, stocks: true, prices: true },
+      });
+      const orderMap = new Map(ids.map((id, idx) => [id, idx]));
+      prods.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+      dbProducts = prods;
+
+      const formatted = formatProducts(dbProducts);
+      return NextResponse.json({
+        items: formatted,
+        total,
+        totalStock: totalStk,
+        globalStats: {
+          totalProducts: 9479,
+          totalStockUnits: 859723,
+          inStockCount: 932,
+          lowStockCount: 4542,
+          outOfStockCount: 3997,
+        },
+        categories: cats.map(c => ({ id: c.id, name: c.name })),
+        page,
+        totalPages: Math.ceil(total / limit),
+        limit,
+        offset,
+      });
+    }
+
+    const orderBy: any = sortBy === 'name_desc' ? { name: 'desc' } : { name: 'asc' };
+
+    const [productsRes, countRes, totalStock, categories] = await Promise.all([
       prisma.product.findMany({
         where: whereClause,
         include: {
@@ -83,7 +131,7 @@ export async function GET(request: NextRequest) {
         },
         take: limit,
         skip: offset,
-        orderBy: { name: 'asc' },
+        orderBy,
       }),
       prisma.product.count({ where: whereClause }),
       getCachedTotalStock(),
@@ -92,44 +140,10 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const formatted: Product[] = dbProducts.map((p) => {
-      const stockList = p.stocks.map((s) => ({
-        warehouseId: 1, // Casa Matriz Bodega 1
-        warehouseName: 'Bodega Principal / Sala de Ventas',
-        quantity: s.quantity,
-      }));
+    dbProducts = productsRes;
+    total = countRes;
 
-      const priceList = p.prices.map((pr, idx) => ({
-        tierId: idx + 1,
-        tierName: pr.tierName,
-        price: pr.price,
-      }));
-
-      if (priceList.length === 0) {
-        priceList.push({ tierId: 1, tierName: 'Normal', price: 0 });
-      }
-
-      return {
-        id: p.id,
-        name: p.name,
-        description: p.description || p.name,
-        isService: p.isService,
-        codes: [
-          { id: 1, type: 'SKU', value: p.sku },
-          { id: 2, type: 'EAN', value: p.barcode || p.sku },
-        ],
-        attributes: { size: 'Estándar', color: 'N/A' },
-        images: [{ id: 1, url: '/placeholder.svg', isPrimary: true }],
-        stock: stockList.length > 0 ? stockList : [{ warehouseId: 1, warehouseName: 'Bodega Principal', quantity: 0 }],
-        reservedStock: 0,
-        prices: priceList,
-        tax: { id: 1, name: 'IVA 12%', rate: p.taxRate },
-        family: { id: p.categoryId || 1, name: p.category?.name || 'General' },
-        suppliers: [],
-        history: [],
-      };
-    });
-
+    const formatted = formatProducts(dbProducts);
     const totalPages = Math.ceil(total / limit);
 
     return NextResponse.json({
@@ -153,4 +167,44 @@ export async function GET(request: NextRequest) {
     console.error('Error in GET /api/products:', error);
     return NextResponse.json({ error: 'Error al consultar productos' }, { status: 500 });
   }
+}
+
+function formatProducts(dbProducts: any[]): Product[] {
+  return dbProducts.map((p) => {
+    const stockList = p.stocks.map((s: any) => ({
+      warehouseId: 1,
+      warehouseName: 'Bodega Principal / Sala de Ventas',
+      quantity: s.quantity,
+    }));
+
+    const priceList = p.prices.map((pr: any, idx: number) => ({
+      tierId: idx + 1,
+      tierName: pr.tierName,
+      price: pr.price,
+    }));
+
+    if (priceList.length === 0) {
+      priceList.push({ tierId: 1, tierName: 'Normal', price: 0 });
+    }
+
+    return {
+      id: p.id,
+      name: p.name,
+      description: p.description || p.name,
+      isService: p.isService,
+      codes: [
+        { id: 1, type: 'SKU', value: p.sku },
+        { id: 2, type: 'EAN', value: p.barcode || p.sku },
+      ],
+      attributes: { size: 'Estándar', color: 'N/A' },
+      images: [{ id: 1, url: '/placeholder.svg', isPrimary: true }],
+      stock: stockList.length > 0 ? stockList : [{ warehouseId: 1, warehouseName: 'Bodega Principal', quantity: 0 }],
+      reservedStock: 0,
+      prices: priceList,
+      tax: { id: 1, name: 'IVA 12%', rate: p.taxRate },
+      family: { id: p.categoryId || 1, name: p.category?.name || 'General' },
+      suppliers: [],
+      history: [],
+    };
+  });
 }

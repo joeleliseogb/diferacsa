@@ -20,7 +20,8 @@ import {
   ChevronsLeft, 
   ChevronsRight,
   Filter,
-  Layers
+  Layers,
+  ArrowUpDown
 } from "lucide-react";
 import Link from 'next/link';
 import type { Product } from '@/lib/product-data';
@@ -42,6 +43,7 @@ export default function InventoryPage() {
   const [totalDatabaseStock, setTotalDatabaseStock] = useState(859723);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [stockStatus, setStockStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('stock_desc');
   const [categories, setCategories] = useState<CategoryOption[]>([]);
 
   // Global KPIs exactos del inventario
@@ -67,6 +69,7 @@ export default function InventoryPage() {
       if (stockStatus && stockStatus !== 'all') {
         params.append('stockStatus', stockStatus);
       }
+      params.append('sortBy', sortBy);
 
       const res = await fetch(`/api/products?${params.toString()}`);
       if (res.ok) {
@@ -85,7 +88,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, page, pageSize, selectedCategory, stockStatus]);
+  }, [searchTerm, page, pageSize, selectedCategory, stockStatus, sortBy]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -253,6 +256,19 @@ export default function InventoryPage() {
                   <SelectItem value="in_stock">En Stock (&gt;20)</SelectItem>
                   <SelectItem value="low_stock">Stock Bajo (1-20)</SelectItem>
                   <SelectItem value="out_of_stock">Agotados (0)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Selector de Ordenamiento */}
+              <Select value={sortBy} onValueChange={(val) => { setSortBy(val); setPage(1); }}>
+                <SelectTrigger className="h-9 text-xs rounded-full bg-[#F4F6F9] dark:bg-muted/50 border-0 shadow-none font-medium w-[160px]">
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Ordenar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stock_desc">Mayor Existencia</SelectItem>
+                  <SelectItem value="name_asc">Nombre (A - Z)</SelectItem>
+                  <SelectItem value="name_desc">Nombre (Z - A)</SelectItem>
                 </SelectContent>
               </Select>
 
