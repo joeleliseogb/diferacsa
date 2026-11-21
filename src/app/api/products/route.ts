@@ -180,11 +180,14 @@ function formatProducts(dbProducts: any[]): Product[] {
       };
     });
 
-    const priceList = p.prices.map((pr: any, idx: number) => ({
-      tierId: idx + 1,
-      tierName: pr.tierName,
-      price: pr.price,
-    }));
+    const tierOrder: Record<string, number> = { Normal: 1, Mayorista: 2, Especial: 3 };
+    const priceList = p.prices
+      .map((pr: any, idx: number) => ({
+        tierId: tierOrder[pr.tierName] || idx + 1,
+        tierName: pr.tierName,
+        price: pr.price,
+      }))
+      .sort((a: any, b: any) => (tierOrder[a.tierName] || 99) - (tierOrder[b.tierName] || 99));
 
     if (priceList.length === 0) {
       priceList.push({ tierId: 1, tierName: 'Normal', price: 0 });

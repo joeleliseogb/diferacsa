@@ -22,6 +22,15 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Sincronizar búsqueda si viene por URL (ej. desde el Buscador Global)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('search');
+      if (q) setSearchTerm(q);
+    }
+  }, []);
+
   useEffect(() => {
     async function loadCustomers() {
       setLoading(true);

@@ -46,6 +46,15 @@ export default function InventoryPage() {
   const [sortBy, setSortBy] = useState<string>('stock_desc');
   const [categories, setCategories] = useState<CategoryOption[]>([]);
 
+  // Sincronizar búsqueda si viene por URL (ej. desde el Buscador Global)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('search');
+      if (q) setSearchTerm(q);
+    }
+  }, []);
+
   // Global KPIs exactos del inventario
   const [globalStats, setGlobalStats] = useState({
     totalProducts: 9479,

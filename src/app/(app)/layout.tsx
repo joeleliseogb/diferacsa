@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AdvancedCalculator } from '@/components/advanced-calculator';
 import { NotificationsPanel } from '@/components/notifications-panel';
+import { GlobalSearch } from '@/components/global-search';
 import { useAuth } from '@/context/auth-context';
 
 /**
@@ -175,14 +176,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {getPageTitle()}
                   </span>
 
-                  {/* Buscador ovalado tipo "Q Cari..." de theme.jpeg */}
+                  {/* Buscador global interactivo y command palette */}
                   <div className="relative w-full max-w-xs">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input 
-                      type="search"
-                      placeholder="Buscar..." 
-                      className="w-full pl-9 pr-4 h-8 text-xs rounded-full bg-[#F4F6F9] dark:bg-muted/50 border-0 shadow-none focus-visible:ring-1 focus-visible:ring-primary/40 placeholder:text-muted-foreground/80 font-medium"
-                    />
+                    <GlobalSearch />
                   </div>
                 </div>
 
