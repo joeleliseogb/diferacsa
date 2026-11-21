@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       whereClause.categoryId = parseInt(categoryId, 10);
     }
 
-    const [dbProducts, total] = await Promise.all([
+    const [dbProducts, total, stockAgg] = await Promise.all([
       prisma.product.findMany({
         where: whereClause,
         include: {
@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
         orderBy: { name: 'asc' },
       }),
       prisma.product.count({ where: whereClause }),
+      prisma.productStock.aggregate({
+        _sum: { quantity: true },
+      }),
     ]);
 
     const formatted: Product[] = dbProducts.map((p) => {
@@ -79,6 +82,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: formatted,
       total,
+      totalStock: stockAgg._sum.quantity || 0,
       limit,
       offset,
     });

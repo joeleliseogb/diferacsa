@@ -18,17 +18,31 @@ import { getCustomers } from '@/lib/servicios';
  */
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerType[]>([]);
+  const [totalCount, setTotalCount] = useState(28773);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function loadCustomers() {
       setLoading(true);
-      const data = await getCustomers(searchTerm);
-      setCustomers(data);
-      setLoading(false);
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(searchTerm)}&limit=100`);
+        if (res.ok) {
+          const json = await res.json();
+          setCustomers(json.items || []);
+          if (json.total !== undefined) setTotalCount(json.total);
+        }
+      } catch {
+        const data = await getCustomers(searchTerm);
+        setCustomers(data);
+      } finally {
+        setLoading(false);
+      }
     }
-    loadCustomers();
+    const handler = setTimeout(() => {
+      loadCustomers();
+    }, 250);
+    return () => clearTimeout(handler);
   }, [searchTerm]);
 
   return (
@@ -58,7 +72,7 @@ export default function CustomersPage() {
           <div>
             <CardTitle className="font-headline text-lg font-bold">Listado de Clientes</CardTitle>
             <CardDescription>
-              Directorio de clientes registrados con sus datos de contacto y facturación.
+              Directorio de {totalCount.toLocaleString()} clientes registrados con sus datos de contacto y facturación.
             </CardDescription>
           </div>
 

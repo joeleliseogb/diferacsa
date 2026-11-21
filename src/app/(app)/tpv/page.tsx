@@ -310,6 +310,38 @@ function TPVContent() {
     setPriceTierDialogOpen(false);
   };
 
+  // Búsqueda en tiempo real contra la base de datos completa (9,479 productos)
+  useEffect(() => {
+    const handler = setTimeout(async () => {
+      if (searchTerm.trim().length >= 2) {
+        const { getProducts } = await import('@/lib/servicios');
+        const searchResults = await getProducts(searchTerm.trim());
+        setProducts(prev => {
+          const map = new Map(prev.map(p => [p.id, p]));
+          searchResults.forEach(p => map.set(p.id, p));
+          return Array.from(map.values());
+        });
+      }
+    }, 200);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Búsqueda en tiempo real contra la base de datos completa (28,773 clientes)
+  useEffect(() => {
+    const handler = setTimeout(async () => {
+      if (customerSearch.trim().length >= 2) {
+        const { getCustomers } = await import('@/lib/servicios');
+        const searchResults = await getCustomers(customerSearch.trim());
+        setCustomers(prev => {
+          const map = new Map(prev.map(c => [c.id, c]));
+          searchResults.forEach(c => map.set(c.id, c));
+          return Array.from(map.values());
+        });
+      }
+    }, 200);
+    return () => clearTimeout(handler);
+  }, [customerSearch]);
+
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products.slice(0, 50); // Show first 50 products by default
     return products.filter(p =>

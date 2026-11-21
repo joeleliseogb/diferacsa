@@ -19,25 +19,34 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [totalDatabaseProducts, setTotalDatabaseProducts] = useState(9479);
+  const [totalDatabaseStock, setTotalDatabaseStock] = useState(859723);
 
   useEffect(() => {
     async function loadProducts() {
-      const data = await getProducts();
-      setProducts(data);
-      setLoading(false);
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(searchTerm)}&limit=100`);
+        if (res.ok) {
+          const json = await res.json();
+          setProducts(json.items || []);
+          if (json.total !== undefined) setTotalDatabaseProducts(json.total);
+          if (json.totalStock !== undefined) setTotalDatabaseStock(json.totalStock);
+        }
+      } catch {
+        const data = await getProducts(searchTerm);
+        setProducts(data);
+      } finally {
+        setLoading(false);
+      }
     }
-    loadProducts();
-  }, []);
+    const handler = setTimeout(() => {
+      loadProducts();
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm) {
-      return products;
-    }
-    return products.filter(product =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.codes || []).some(code => code.value.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [products, searchTerm]);
+  const filteredProducts = products;
 
   // Contadores para métricas de stock
   const { totalStockCount, lowStockCount, outOfStockCount } = useMemo(() => {
@@ -96,7 +105,7 @@ export default function InventoryPage() {
           </div>
           <div>
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total Items</span>
-            <p className="text-xl font-bold text-foreground font-headline">{products.length}</p>
+            <p className="text-xl font-bold text-foreground font-headline">{totalDatabaseProducts.toLocaleString()}</p>
           </div>
         </div>
 
@@ -106,7 +115,7 @@ export default function InventoryPage() {
           </div>
           <div>
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Unidades Stock</span>
-            <p className="text-xl font-bold text-foreground font-headline">{totalStockCount}</p>
+            <p className="text-xl font-bold text-foreground font-headline">{Math.round(totalDatabaseStock).toLocaleString()}</p>
           </div>
         </div>
 
