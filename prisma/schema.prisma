@@ -1,0 +1,185 @@
+// Prisma Schema para Diferacsa ERP & TPV Multi-Sucursal
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./diferacsa.db"
+}
+
+// ----------------------------------------------------
+// 1. ESTRUCTURA MULTI-SUCURSAL Y MULTI-BODEGAS
+// ----------------------------------------------------
+
+model Branch {
+  id          String      @id @default(cuid())
+  code        String      @unique // e.g. "MATRIZ", "SUCURSAL-2"
+  name        String      // "Casa Matriz - Ferretería González"
+  address     String?
+  phone       String?
+  isMain      Boolean     @default(false)
+  warehouses  Warehouse[]
+  invoices    Invoice[]
+  transfersFrom StockTransfer[] @relation("TransferOrigin")
+  transfersTo   StockTransfer[] @relation("TransferDest")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Warehouse {
+  id          String         @id @default(cuid())
+  branchId    String
+  branch      Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  code        String         // "BOD-1", "SALA-VENTAS"
+  name        String         // "Bodega Principal / Sala de Ventas"
+  isDefault   Boolean        @default(false)
+  stocks      ProductStock[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([branchId, code])
+}
+
+// ----------------------------------------------------
+// 2. CATÁLOGO MAESTRO DE ARTÍCULOS Y PRECIOS
+// ----------------------------------------------------
+
+model Category {
+  id          Int       @id
+  name        String    @unique
+  products    Product[]
+}
+
+model Product {
+  id          String         @id // e.g. "Prod10"
+  sku         String         // e.g. "CEM5800"
+  barcode     String?
+  name        String
+  description String?
+  categoryId  Int?
+  category    Category?      @relation(fields: [categoryId], references: [id])
+  taxRate     Float          @default(0.12)
+  isService   Boolean        @default(false)
+  stocks      ProductStock[]
+  prices      ProductPrice[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([sku])
+  @@index([name])
+}
+
+model ProductStock {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantity    Float     @default(0)
+  minStock    Float     @default(0)
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([productId, warehouseId])
+}
+
+model ProductPrice {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tierName    String   // "Normal", "Mayorista", "Especial"
+  price       Float
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, tierName])
+}
+
+// ----------------------------------------------------
+// 3. CLIENTES Y PROVEEDORES
+// ----------------------------------------------------
+
+model Customer {
+  id               String    @id
+  code             String?
+  name             String
+  fiscalName       String?
+  nit              String?
+  email            String?
+  phone            String?
+  address          String?
+  creditLimit      Float     @default(0)
+  currentBalance   Float     @default(0)
+  hasCredit        Boolean   @default(false)
+  maxDiscount      Float     @default(0)
+  priceTier        String    @default("Normal")
+  invoices         Invoice[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([name])
+  @@index([nit])
+}
+
+model Supplier {
+  id             String   @id
+  name           String
+  contactPerson  String?
+  nit            String?
+  phone          String?
+  email          String?
+  address        String?
+  currentBalance Float    @default(0)
+  hasCredit      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([name])
+}
+
+// ----------------------------------------------------
+// 4. VENTAS, FACTURAS Y TRASLADOS ENTRE SUCURSALES
+// ----------------------------------------------------
+
+model Invoice {
+  id             String        @id
+  branchId       String
+  branch         Branch        @relation(fields: [branchId], references: [id])
+  invoiceNumber  String
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  date           DateTime      @default(now())
+  total          Float
+  balance        Float         @default(0)
+  isCredit       Boolean       @default(false)
+  isCancelled    Boolean       @default(false)
+  cashierName    String?
+  items          InvoiceItem[]
+  createdAt      DateTime      @default(now())
+
+  @@index([branchId])
+  @@index([date])
+}
+
+model InvoiceItem {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId  String
+  quantity   Float
+  price      Float
+  total      Float
+  discount   Float    @default(0)
+}
+
+model StockTransfer {
+  id             String         @id @default(cuid())
+  fromBranchId   String
+  fromBranch     Branch         @relation("TransferOrigin", fields: [fromBranchId], references: [id])
+  toBranchId     String
+  toBranch       Branch         @relation("TransferDest", fields: [toBranchId], references: [id])
+  status         String         @default("EN_TRANSITO") // "SOLICITADO", "EN_TRANSITO", "RECIBIDO", "CANCELADO"
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}

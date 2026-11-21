@@ -82,7 +82,22 @@ export async function getProducts_server(): Promise<Product[]> {
 }
 
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(searchTerm?: string): Promise<Product[]> {
+    try {
+        const url = typeof window !== 'undefined' 
+            ? `/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=100` 
+            : `http://localhost:9002/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=100`;
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.items && data.items.length > 0) {
+                return data.items;
+            }
+        }
+    } catch {
+        // En caso de fallo de red, fallback a memoria local
+    }
+
     const allActiveReservations = await getAllReservations();
     const productsWithReservedStock: Product[] = JSON.parse(JSON.stringify(memoryProducts));
 

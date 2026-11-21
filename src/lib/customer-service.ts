@@ -73,6 +73,21 @@ async function ensureDataIsSeeded() {
 }
 
 export async function getCustomers(searchTerm?: string): Promise<Customer[]> {
+  try {
+    const url = typeof window !== 'undefined'
+      ? `/api/customers?search=${encodeURIComponent(searchTerm || '')}&limit=100`
+      : `http://localhost:9002/api/customers?search=${encodeURIComponent(searchTerm || '')}&limit=100`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        return data.items;
+      }
+    }
+  } catch {
+    // Fallback a memoria
+  }
+
   await ensureDataIsSeeded();
   let customers: Customer[];
 
