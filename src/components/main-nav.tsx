@@ -71,7 +71,6 @@ export function MainNav() {
 
   const mainMenuItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid, permission: 'ver-dashboard' as Permission },
-    { href: "/workflow", label: "Flujo Operativo", icon: DatabaseZap, permission: 'ver-dashboard' as Permission },
     { href: "/tpv", label: "Punto de Venta", icon: Calculator, permission: 'acceder-tpv' as Permission },
     { href: "/customers", label: "Clientes", icon: Users, permission: 'ver-clientes' as Permission },
   ];
