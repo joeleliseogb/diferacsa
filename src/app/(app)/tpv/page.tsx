@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2, ShoppingCart, Package, Flame } from "lucide-react";
+import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2, ShoppingCart, Package, Flame, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Customer, Order, Quote, Purchase, OrderProduct, QuoteProduct, Address, PaymentMethod, PriceTier, PurchaseProduct, ProductFamily, Tax, Reservation } from "@/lib/servicios";
 import type { Product } from "@/lib/product-data";
@@ -171,6 +171,7 @@ function TPVContent() {
   const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] = useState(false);
   const [customerPurchases, setCustomerPurchases] = useState<Purchase[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [addingHistoricalSku, setAddingHistoricalSku] = useState<string | null>(null);
   const [calculatorContext, setCalculatorContext] = useState<CalculatorContext>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
@@ -339,8 +340,20 @@ function TPVContent() {
 
   useEffect(() => {
     const customerId = searchParams.get('customerId');
-    if (customerId && customers.some(c => c.id === customerId)) {
+    if (customerId) {
+      if (customers.some(c => c.id === customerId)) {
         setSelectedCustomerId(customerId);
+      } else {
+        fetch(`/api/customers/${encodeURIComponent(customerId)}`)
+          .then(res => res.ok ? res.json() : null)
+          .then((c: Customer | null) => {
+            if (c) {
+              setCustomers(prev => prev.some(item => item.id === c.id) ? prev : [...prev, c]);
+              setSelectedCustomerId(c.id);
+            }
+          })
+          .catch(err => console.error("Error loading customer from query:", err));
+      }
     }
   }, [searchParams, customers]);
 
@@ -619,6 +632,250 @@ function TPVContent() {
         const inputRef = cartItemRefs.current.get(`${sku}-${selectedWarehouseId}`);
         inputRef?.select();
     }, 0);
+  };
+
+  /**
+   * Envía un producto al carrito directamente desde una línea del historial / factura.
+   * Si hay stock en la bodega/sucursal actual seleccionada, se añade directamente.
+   * Si no hay stock libre en la bodega actual, revisa las otras sucursales/bodegas y avisa
+   * con notificación clara que se requerirá un vale de traslado entre sucursales.
+   * Si está agotado en todas las bodegas, emite alerta de agotado.
+   */
+  const handleAddHistoricalProductToCart = async (
+    historicalItem: { sku: string; name: string; qty: number; price?: number },
+    options: { silent?: boolean; batch?: boolean } = {}
+  ): Promise<{ success: boolean; isTransfer?: boolean; reason?: string }> => {
+    try {
+      if (!options.batch) {
+        setAddingHistoricalSku(historicalItem.sku);
+      }
+
+      // 1. Buscar en estado local de productos
+      let product = products.find(
+        p => p.codes.some(c => c.value?.trim().toUpperCase() === historicalItem.sku?.trim().toUpperCase()) ||
+             p.id?.toLowerCase() === historicalItem.sku?.toLowerCase() ||
+             p.name.trim().toLowerCase() === historicalItem.name.trim().toLowerCase()
+      );
+
+      // 2. Si no está en memoria, consultar la base de datos completa vía API
+      if (!product) {
+        try {
+          let res = await fetch(`/api/products?search=${encodeURIComponent(historicalItem.sku)}&limit=5`);
+          if (res.ok) {
+            const data = await res.json();
+            const items: Product[] = data.items || [];
+            product = items.find(
+              p => p.codes.some(c => c.value?.trim().toUpperCase() === historicalItem.sku?.trim().toUpperCase()) ||
+                   p.id?.toLowerCase() === historicalItem.sku?.toLowerCase()
+            ) || items[0];
+          }
+
+          if (!product && historicalItem.name) {
+            res = await fetch(`/api/products?search=${encodeURIComponent(historicalItem.name.slice(0, 35))}&limit=5`);
+            if (res.ok) {
+              const data = await res.json();
+              const items: Product[] = data.items || [];
+              product = items.find(
+                p => p.name.trim().toLowerCase() === historicalItem.name.trim().toLowerCase()
+              ) || items[0];
+            }
+          }
+
+          if (product) {
+            setProducts(prev => prev.some(p => p.id === product!.id) ? prev : [...prev, product!]);
+          }
+        } catch (fetchErr) {
+          console.error("Error consultando producto histórico:", fetchErr);
+        }
+      }
+
+      if (!product) {
+        if (!options.silent) {
+          toast({
+            title: "Producto no encontrado",
+            description: `No se localizó "${historicalItem.name}" (${historicalItem.sku}) en el catálogo activo.`,
+            variant: "destructive",
+          });
+        }
+        return { success: false, reason: "not_found" };
+      }
+
+      const targetQty = Number(historicalItem.qty) > 0 ? Number(historicalItem.qty) : 1;
+      const sku = product.codes.find(c => c.type === 'SKU')?.value || historicalItem.sku;
+      const currentWh = warehouses.find(w => w.id.toString() === selectedWarehouseId.toString()) || warehouses[0];
+      const currentWhId = currentWh ? currentWh.id.toString() : (selectedWarehouseId || '1');
+      const currentWhName = currentWh?.name || 'Bodega Principal';
+
+      // 3. Revisión de existencias multi-bodega / multi-sucursal
+      const isService = Boolean(product.isService);
+      const stockInCurrentWh = (product.stock.find(s => s.warehouseId.toString() === currentWhId)?.quantity || 0) - (product.reservedStock || 0);
+
+      let targetWarehouseId = currentWhId;
+      let targetWarehouseName = currentWhName;
+      let isTransfer = false;
+      let originWarehouseName = '';
+
+      if (isService || stockInCurrentWh >= targetQty) {
+        // Stock suficiente en la bodega actualmente activa
+        targetWarehouseId = currentWhId;
+        targetWarehouseName = currentWhName;
+      } else if (stockInCurrentWh > 0) {
+        // Hay stock parcial en bodega actual, pero verificamos si otra sucursal/bodega tiene la cantidad completa
+        const otherWarehouses = product.stock
+          .filter(s => s.warehouseId.toString() !== currentWhId && s.quantity > 0)
+          .sort((a, b) => b.quantity - a.quantity);
+
+        if (otherWarehouses.length > 0 && otherWarehouses[0].quantity >= targetQty) {
+          // La otra sucursal/bodega tiene existencia completa
+          const bestWh = otherWarehouses[0];
+          targetWarehouseId = bestWh.warehouseId.toString();
+          targetWarehouseName = bestWh.warehouseName || `Bodega #${bestWh.warehouseId}`;
+          isTransfer = true;
+          originWarehouseName = targetWarehouseName;
+        } else {
+          // Despachar desde la bodega actual con lo que hay disponible
+          targetWarehouseId = currentWhId;
+          targetWarehouseName = currentWhName;
+        }
+      } else {
+        // CERO existencias en la bodega actual: buscar en otras bodegas / sucursales
+        const otherWarehouses = product.stock
+          .filter(s => s.warehouseId.toString() !== currentWhId && s.quantity > 0)
+          .sort((a, b) => b.quantity - a.quantity);
+
+        if (otherWarehouses.length > 0) {
+          const bestWh = otherWarehouses[0];
+          targetWarehouseId = bestWh.warehouseId.toString();
+          targetWarehouseName = bestWh.warehouseName || `Bodega #${bestWh.warehouseId}`;
+          isTransfer = true;
+          originWarehouseName = targetWarehouseName;
+        } else {
+          // Agotado en todas las bodegas de la empresa
+          if (!options.silent) {
+            toast({
+              title: "Producto Agotado en Todas las Sucursales",
+              description: `"${product.name}" (${sku}) no tiene existencias en ${currentWhName} ni en las demás bodegas de la empresa.`,
+              variant: "destructive",
+            });
+          }
+          return { success: false, reason: "out_of_stock" };
+        }
+      }
+
+      // 4. Determinar precio según tarifa del cliente o precio histórico
+      const price = getProductPriceForTier(product, activePriceTier) || Number(historicalItem.price) || 0;
+
+      // 5. Añadir al carrito
+      setCart(prevCart => {
+        const existingIndex = prevCart.findIndex(
+          it => it.sku === sku && it.warehouseId.toString() === targetWarehouseId.toString()
+        );
+        if (existingIndex >= 0) {
+          const updated = [...prevCart];
+          const curr = updated[existingIndex];
+          updated[existingIndex] = {
+            ...curr,
+            qty: curr.qty + targetQty,
+            price: price || curr.price,
+            prices: product!.prices,
+          };
+          return updated;
+        } else {
+          const newItem: CartItem = {
+            sku,
+            name: product!.name,
+            qty: targetQty,
+            qtyDelivered: 0,
+            price,
+            warehouseId: targetWarehouseId,
+            warehouseName: targetWarehouseName,
+            prices: product!.prices,
+          };
+          return [...prevCart, newItem];
+        }
+      });
+
+      // 6. Alerta interactiva clara para el cajero
+      if (!options.silent) {
+        if (isTransfer) {
+          toast({
+            title: "🚚 Traslado Requerido entre Sucursales",
+            description: `Sin existencias en ${currentWhName}. Se cargó "${product.name}" (${targetQty} ud.) desde ${originWarehouseName}. Se requerirá vale de traslado/entrega.`,
+            className: "border-amber-500 bg-amber-50/95 text-amber-950 dark:bg-amber-950/80 dark:text-amber-100",
+          });
+        } else {
+          toast({
+            title: "Producto cargado al carrito",
+            description: `"${product.name}" (${targetQty} ud.) agregado desde ${targetWarehouseName}.`,
+          });
+        }
+      }
+
+      return { success: true, isTransfer };
+    } finally {
+      if (!options.batch) {
+        setAddingHistoricalSku(null);
+      }
+    }
+  };
+
+  /**
+   * Carga una factura histórica completa al carrito con validación multi-bodega y aviso de traslados.
+   */
+  const handleAddWholeInvoiceToCart = async (purchase: Purchase) => {
+    if (!purchase.products || purchase.products.length === 0) {
+      toast({
+        title: "Factura sin productos",
+        description: "Esta factura no contiene líneas registradas.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAddingHistoricalSku(`invoice-${purchase.invoice}`);
+    try {
+      let added = 0;
+      let transfers = 0;
+      let outOfStock = 0;
+      let notFound = 0;
+
+      for (const item of purchase.products) {
+        const res = await handleAddHistoricalProductToCart(item, { silent: true, batch: true });
+        if (res.success) {
+          added++;
+          if (res.isTransfer) transfers++;
+        } else if (res.reason === "out_of_stock") {
+          outOfStock++;
+        } else {
+          notFound++;
+        }
+      }
+
+      setHistoryDialogOpen(false);
+
+      if (added > 0) {
+        let message = `Se cargaron ${added} producto(s) de la Factura #${purchase.invoice} al carrito.`;
+        if (transfers > 0) {
+          message += ` ⚠️ ${transfers} producto(s) requieren traslado entre sucursales.`;
+        }
+        if (outOfStock > 0) {
+          message += ` (${outOfStock} sin stock en ninguna sucursal).`;
+        }
+        toast({
+          title: transfers > 0 ? "🚚 Factura cargada con traslados" : "Factura cargada al carrito",
+          description: message,
+          className: transfers > 0 ? "border-amber-500 bg-amber-50/95 text-amber-950 dark:bg-amber-950/80 dark:text-amber-100" : undefined,
+        });
+      } else {
+        toast({
+          title: "No se pudieron agregar productos",
+          description: "Los artículos de esta factura están agotados en todas las sucursales o no están disponibles.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setAddingHistoricalSku(null);
+    }
   };
     
   const handleUpdateCartItem = (sku: string, warehouseId: string, field: 'qty' | 'price', value: number) => {
@@ -1684,7 +1941,15 @@ function TPVContent() {
                                             <Calculator className="h-2.5 w-2.5" />
                                         </Button>
                                     </div>
-                                    <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} className="mt-1" />
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                        <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} />
+                                        {item.warehouseId.toString() !== selectedWarehouseId.toString() && (
+                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 flex items-center gap-1 font-semibold" title={`Requiere traslado desde ${item.warehouseName}`}>
+                                                <Truck className="h-2.5 w-2.5" />
+                                                Traslado requerido
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </TableCell>
                                 <TableCell className="py-2 px-1 text-center">
                                     <div className="flex items-center justify-center gap-0.5">
@@ -2050,14 +2315,14 @@ function TPVContent() {
     </div>
       
        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
               Historial de Compras: {selectedCustomer.name}
             </DialogTitle>
             <DialogDescription>
-              Facturas históricas y productos comprados por este cliente en Diferacsa.
+              Consulta facturas previas y envía productos o facturas completas al carrito directamente con control inteligente de existencias y traslados.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -2067,7 +2332,7 @@ function TPVContent() {
                 <p className="text-sm">Consultando facturas históricas en la base de datos...</p>
               </div>
             ) : (
-              <ScrollArea className="h-[400px] pr-2">
+              <ScrollArea className="h-[430px] pr-2">
                 {customerPurchases.length > 0 ? (
                   <Accordion type="single" collapsible className="space-y-2">
                     {customerPurchases.map((purchase) => (
@@ -2091,23 +2356,59 @@ function TPVContent() {
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="pt-1 pb-3">
+                          <div className="flex items-center justify-between px-2.5 py-1.5 mb-2 bg-muted/40 rounded-lg border border-border/50">
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {purchase.products.length} {purchase.products.length === 1 ? 'artículo' : 'artículos'} en Factura #{purchase.invoice}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 text-xs gap-1.5 font-semibold text-primary hover:text-primary-foreground hover:bg-primary transition-all shadow-xs"
+                              onClick={() => handleAddWholeInvoiceToCart(purchase)}
+                              disabled={addingHistoricalSku !== null}
+                            >
+                              {addingHistoricalSku === `invoice-${purchase.invoice}` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                              Cargar Factura al Carrito
+                            </Button>
+                          </div>
                           <Table>
                             <TableHeader>
                               <TableRow className="border-b text-[11px] text-muted-foreground">
                                 <TableHead className="h-7 py-0">Producto</TableHead>
-                                <TableHead className="h-7 py-0 text-center w-20">Cant.</TableHead>
-                                <TableHead className="h-7 py-0 text-right w-24">Precio</TableHead>
+                                <TableHead className="h-7 py-0 text-center w-16">Cant.</TableHead>
+                                <TableHead className="h-7 py-0 text-right w-24">Precio Unit.</TableHead>
+                                <TableHead className="h-7 py-0 text-right w-28">Acción</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {purchase.products.map((p, i) => (
-                                <TableRow key={i} className="border-b/50">
-                                  <TableCell className="py-1.5 text-xs font-medium">
-                                    <p className="leading-tight">{p.name}</p>
+                                <TableRow key={i} className="border-b/50 hover:bg-muted/30">
+                                  <TableCell className="py-2 text-xs font-medium">
+                                    <p className="leading-tight text-foreground font-medium">{p.name}</p>
                                     <p className="text-[10px] font-mono text-muted-foreground">{p.sku}</p>
                                   </TableCell>
-                                  <TableCell className="py-1.5 text-xs text-center font-bold">{p.qty}</TableCell>
-                                  <TableCell className="py-1.5 text-xs text-right font-mono">Q{Number(p.price || 0).toFixed(2)}</TableCell>
+                                  <TableCell className="py-2 text-xs text-center font-bold">{p.qty}</TableCell>
+                                  <TableCell className="py-2 text-xs text-right font-mono">Q{Number(p.price || 0).toFixed(2)}</TableCell>
+                                  <TableCell className="py-2 text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2.5 text-xs gap-1.5 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                                      onClick={() => handleAddHistoricalProductToCart(p)}
+                                      disabled={addingHistoricalSku !== null}
+                                    >
+                                      {addingHistoricalSku === p.sku ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <ShoppingCart className="h-3 w-3" />
+                                      )}
+                                      <span>+ Carrito</span>
+                                    </Button>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>

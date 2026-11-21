@@ -33,7 +33,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Edit, FileText, MapPin, Phone, Mail, Home, CreditCard, DollarSign, Tag, Calendar, Package, Clock, Wallet, Percent, ClipboardList, HandCoins, Banknote, Edit3, PlusCircle, Trash2 } from "lucide-react"
+import { ArrowLeft, Edit, FileText, MapPin, Phone, Mail, Home, CreditCard, DollarSign, Tag, Calendar, Package, Clock, Wallet, Percent, ClipboardList, HandCoins, Banknote, Edit3, PlusCircle, Trash2, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { getCustomer, registerBulkPayment, type Customer, type PaymentMethod, getPaymentMethods, type PurchaseProduct, type Purchase, addCashRegisterMovement, getAllReservations, getProducts, saveReservation, type Reservation, type ReservationProduct, type Product } from '@/lib/servicios';
 import { Skeleton } from '@/components/ui/skeleton'
@@ -472,7 +472,15 @@ export default function PaginaDetalleCliente() {
                                   </div>
                               </div>
                               <div>
-                                  <h4 className="font-semibold mb-2 mt-2 flex items-center gap-2"><Package className="h-4 w-4"/>Productos Despachados</h4>
+                                  <div className="flex items-center justify-between mb-2 mt-2">
+                                      <h4 className="font-semibold flex items-center gap-2"><Package className="h-4 w-4"/>Productos Despachados</h4>
+                                      <Link href={`/tpv?customerId=${cliente.id}`}>
+                                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 font-medium text-primary hover:bg-primary hover:text-primary-foreground">
+                                          <ShoppingCart className="h-3.5 w-3.5" />
+                                          Cargar en TPV
+                                        </Button>
+                                      </Link>
+                                  </div>
                                   <Table>
                                   <TableHeader>
                                       <TableRow>
