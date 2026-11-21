@@ -1683,11 +1683,6 @@ function TPVContent() {
                                         <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'price', item.price)}>
                                             <Calculator className="h-2.5 w-2.5" />
                                         </Button>
-                                        {item.prices && item.prices.length > 1 && (
-                                            <span className="text-[9.5px] font-mono text-muted-foreground/90 bg-muted/60 dark:bg-muted/30 px-1.5 py-0.5 rounded border border-border/60">
-                                                N: Q{getPriceFromPricesList(item.prices, 'Normal')?.toFixed(2)} • M: Q{getPriceFromPricesList(item.prices, 'Mayorista')?.toFixed(2)} • E: Q{getPriceFromPricesList(item.prices, 'Especial')?.toFixed(2)}
-                                            </span>
-                                        )}
                                     </div>
                                     <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} className="mt-1" />
                                 </TableCell>
