@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck } from "lucide-react";
+import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Customer, Order, Quote, Purchase, OrderProduct, QuoteProduct, Address, PaymentMethod, PriceTier, PurchaseProduct, ProductFamily, Tax, Reservation } from "@/lib/servicios";
 import type { Product } from "@/lib/product-data";
@@ -106,6 +106,10 @@ function TPVContent() {
   const [parkedSalesDialogOpen, setParkedSalesDialogOpen] = useState(false);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [totalCustomerCount, setTotalCustomerCount] = useState<number>(28773);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [customerOffset, setCustomerOffset] = useState<number>(100);
+  const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] = useState(false);
   const [calculatorContext, setCalculatorContext] = useState<CalculatorContext>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
@@ -187,8 +191,20 @@ function TPVContent() {
       const productsData = await getProducts();
       setProducts(productsData);
 
-      const customersData = await getCustomers();
-      setCustomers([defaultCustomer, ...customersData]);
+      try {
+        const res = await fetch('/api/customers?limit=100&offset=0');
+        if (res.ok) {
+          const json = await res.json();
+          setCustomers([defaultCustomer, ...(json.items || [])]);
+          if (json.total !== undefined) setTotalCustomerCount(json.total);
+        } else {
+          const customersData = await getCustomers();
+          setCustomers([defaultCustomer, ...customersData]);
+        }
+      } catch {
+        const customersData = await getCustomers();
+        setCustomers([defaultCustomer, ...customersData]);
+      }
 
       const terminalsData = await getPosTerminals();
       setTerminals(terminalsData);
@@ -328,19 +344,66 @@ function TPVContent() {
 
   // Búsqueda en tiempo real contra la base de datos completa (28,773 clientes)
   useEffect(() => {
+    const query = customerSearch.trim();
+    if (!query) {
+      setIsSearchingCustomer(false);
+      return;
+    }
+
+    setIsSearchingCustomer(true);
     const handler = setTimeout(async () => {
-      if (customerSearch.trim().length >= 2) {
-        const { getCustomers } = await import('@/lib/servicios');
-        const searchResults = await getCustomers(customerSearch.trim());
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}&limit=100`);
+        if (res.ok) {
+          const json = await res.json();
+          const searchResults: Customer[] = json.items || [];
+          setCustomers(prev => {
+            const map = new Map<string, Customer>();
+            map.set(defaultCustomer.id, defaultCustomer);
+            if (selectedCustomerId && selectedCustomerId !== defaultCustomer.id) {
+              const current = prev.find(c => c.id === selectedCustomerId);
+              if (current) map.set(current.id, current);
+            }
+            searchResults.forEach(c => map.set(c.id, c));
+            return Array.from(map.values());
+          });
+          if (json.total !== undefined) {
+            setTotalCustomerCount(json.total);
+          }
+        }
+      } catch (err) {
+        console.error('Error al buscar clientes:', err);
+      } finally {
+        setIsSearchingCustomer(false);
+      }
+    }, 150);
+
+    return () => clearTimeout(handler);
+  }, [customerSearch, selectedCustomerId]);
+
+  const handleLoadMoreCustomers = async () => {
+    if (isLoadingMoreCustomers) return;
+    setIsLoadingMoreCustomers(true);
+    try {
+      const nextOffset = customerOffset;
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearch.trim())}&limit=100&offset=${nextOffset}`);
+      if (res.ok) {
+        const json = await res.json();
+        const newItems: Customer[] = json.items || [];
         setCustomers(prev => {
           const map = new Map(prev.map(c => [c.id, c]));
-          searchResults.forEach(c => map.set(c.id, c));
+          newItems.forEach(c => map.set(c.id, c));
           return Array.from(map.values());
         });
+        setCustomerOffset(nextOffset + 100);
+        if (json.total !== undefined) setTotalCustomerCount(json.total);
       }
-    }, 200);
-    return () => clearTimeout(handler);
-  }, [customerSearch]);
+    } catch (err) {
+      console.error('Error al cargar más clientes:', err);
+    } finally {
+      setIsLoadingMoreCustomers(false);
+    }
+  };
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products.slice(0, 50); // Show first 50 products by default
@@ -351,22 +414,8 @@ function TPVContent() {
   }, [products, searchTerm]);
 
   const filteredCustomersForSearch = useMemo(() => {
-    const lowercasedTerm = customerSearch.toLowerCase();
-    if (!lowercasedTerm) return customers.filter(c => c.id !== '0');
-    return customers.filter(c => {
-      if (c.id === '0') return false;
-      const searchInString = (str: string | undefined | null) => str?.toLowerCase().includes(lowercasedTerm);
-      
-      const inName = searchInString(c.name);
-      const inEmail = searchInString(c.email);
-      const inNit = searchInString(c.nit);
-      
-      const inPhones = c.phones.some(phone => searchInString(phone.number));
-      const inAddresses = c.addresses.some(addr => searchInString(addr.street) || searchInString(addr.city));
-      
-      return inName || inEmail || inNit || inPhones || inAddresses;
-    });
-  }, [customers, customerSearch]);
+    return customers.filter(c => c.id !== '0');
+  }, [customers]);
 
   const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.qty, 0), [cart]);
 
@@ -1195,34 +1244,101 @@ function TPVContent() {
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[350px] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Buscar por nombre, NIT, teléfono..." onValueChange={setCustomerSearch} />
-                                    <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
-                                    <CommandList>
+                            <PopoverContent className="w-[380px] p-0" align="end">
+                                <Command shouldFilter={false}>
+                                    <CommandInput 
+                                        placeholder="Buscar por nombre, NIT, teléfono..." 
+                                        value={customerSearch}
+                                        onValueChange={setCustomerSearch} 
+                                    />
+                                    <div className="px-3 py-1.5 bg-muted/40 border-b flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+                                        <span>
+                                            {customerSearch.trim()
+                                                ? (isSearchingCustomer ? "Buscando en 28,773 clientes..." : `${filteredCustomersForSearch.length} coincidencias`)
+                                                : `Mostrando ${filteredCustomersForSearch.length} de ${totalCustomerCount.toLocaleString()} clientes`}
+                                        </span>
+                                        {isSearchingCustomer ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 font-mono">Total: {totalCustomerCount.toLocaleString()}</span>
+                                        )}
+                                    </div>
+                                    <CommandList className="max-h-[340px] overflow-y-auto">
+                                        <CommandEmpty>
+                                            {isSearchingCustomer ? (
+                                                <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                    Buscando en la base de datos...
+                                                </div>
+                                            ) : (
+                                                <div className="py-6 text-center text-xs text-muted-foreground">
+                                                    No se encontró ningún cliente con ese criterio.
+                                                </div>
+                                            )}
+                                        </CommandEmpty>
                                         <CommandGroup>
-                                            <CommandItem key={defaultCustomer.id} onSelect={() => { setSelectedCustomerId(defaultCustomer.id); setCustomerPopoverOpen(false); }}>
-                                                <div className="flex items-center">
+                                            <CommandItem 
+                                                key={defaultCustomer.id} 
+                                                onSelect={() => { setSelectedCustomerId(defaultCustomer.id); setCustomerPopoverOpen(false); }}
+                                                className="border-b mb-1 pb-2 cursor-pointer"
+                                            >
+                                                <div className="flex items-center w-full">
                                                     <Check className={cn("mr-2 h-4 w-4", selectedCustomerId === defaultCustomer.id ? "opacity-100" : "opacity-0")} />
-                                                    <span>{defaultCustomer.name}</span>
+                                                    <div className="flex-grow">
+                                                        <span className="font-semibold text-primary">{defaultCustomer.name}</span>
+                                                        <p className="text-[10px] text-muted-foreground">Venta rápida al mostrador</p>
+                                                    </div>
                                                 </div>
                                             </CommandItem>
                                             {filteredCustomersForSearch.map((c) => {
                                                 const primaryPhone = c.phones.find(p => p.isPrimary)?.number || (c.phones.length > 0 ? c.phones[0].number : null);
                                                 return (
-                                                <CommandItem key={c.id} value={`${c.name} ${c.nit} ${primaryPhone}`} onSelect={() => { setSelectedCustomerId(c.id); setCustomerPopoverOpen(false); }}>
+                                                <CommandItem 
+                                                    key={c.id} 
+                                                    value={c.id} 
+                                                    onSelect={() => { setSelectedCustomerId(c.id); setCustomerPopoverOpen(false); }}
+                                                    className="cursor-pointer"
+                                                >
                                                     <div className="flex items-start w-full">
-                                                        <Check className={cn("mr-2 h-4 w-4 mt-1", selectedCustomerId === c.id ? "opacity-100" : "opacity-0")} />
-                                                        <div className="flex-grow">
-                                                            <p>{c.name}</p>
-                                                            <p className="text-xs text-muted-foreground">Tel: {primaryPhone || 'N/A'} | NIT: {c.nit}</p>
+                                                        <Check className={cn("mr-2 h-4 w-4 mt-1 shrink-0", selectedCustomerId === c.id ? "opacity-100" : "opacity-0")} />
+                                                        <div className="flex-grow min-w-0">
+                                                            <p className="font-medium text-sm truncate">{c.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {primaryPhone ? `Tel: ${primaryPhone}` : 'Sin teléfono'} • NIT: <span className="font-mono">{c.nit || 'C/F'}</span>
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 </CommandItem>
                                                 )
                                             })}
+
+                                            {!customerSearch.trim() && filteredCustomersForSearch.length < totalCustomerCount && (
+                                                <div className="p-2 border-t mt-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={isLoadingMoreCustomers}
+                                                        onClick={handleLoadMoreCustomers}
+                                                        className="w-full text-xs font-semibold gap-1.5 h-8"
+                                                    >
+                                                        {isLoadingMoreCustomers ? (
+                                                            <>
+                                                                <Loader2 className="h-3 w-3 animate-spin" /> Cargando más clientes...
+                                                            </>
+                                                        ) : (
+                                                            <>Cargar 100 clientes más ({filteredCustomersForSearch.length} de {totalCustomerCount.toLocaleString()})</>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </CommandGroup>
                                     </CommandList>
+                                    <div className="p-2 border-t bg-muted/20 text-center">
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Escribe en el buscador para localizar al instante a cualquiera de los <strong className="text-foreground">{totalCustomerCount.toLocaleString()}</strong> clientes por nombre, NIT o teléfono.
+                                        </p>
+                                    </div>
                                 </Command>
                             </PopoverContent>
                         </Popover>
