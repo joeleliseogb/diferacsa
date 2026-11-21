@@ -24,17 +24,35 @@ export async function GET(
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
     }
 
+    const allProductIds = Array.from(
+      new Set(
+        (c.invoices || []).flatMap((inv) => (inv.items || []).map((it) => it.productId))
+      )
+    );
+
+    const products = allProductIds.length > 0
+      ? await prisma.product.findMany({
+          where: { id: { in: allProductIds } },
+          select: { id: true, name: true, sku: true },
+        })
+      : [];
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
     const purchases = (c.invoices || []).map((inv) => ({
       invoice: inv.invoiceNumber,
       date: inv.date.toISOString().split('T')[0],
       total: `Q${inv.total.toFixed(2)}`,
       status: inv.isCancelled ? ('Anulado' as const) : inv.isCredit ? ('Pendiente de Pago' as const) : ('Pagado' as const),
-      products: (inv.items || []).map((it) => ({
-        sku: it.productId,
-        name: it.productId,
-        qty: it.quantity,
-        price: it.price,
-      })),
+      products: (inv.items || []).map((it) => {
+        const prod = productMap.get(it.productId);
+        return {
+          sku: prod?.sku || it.productId,
+          name: prod?.name || it.productId,
+          qty: it.quantity,
+          price: it.price,
+        };
+      }),
       branchId: inv.branchId,
     }));
 

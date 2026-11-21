@@ -110,6 +110,8 @@ function TPVContent() {
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [customerOffset, setCustomerOffset] = useState<number>(100);
   const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] = useState(false);
+  const [customerPurchases, setCustomerPurchases] = useState<Purchase[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [calculatorContext, setCalculatorContext] = useState<CalculatorContext>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [productDetailModalOpen, setProductDetailModalOpen] = useState(false);
@@ -404,6 +406,27 @@ function TPVContent() {
       setIsLoadingMoreCustomers(false);
     }
   };
+
+  useEffect(() => {
+    async function loadCustomerHistory() {
+      if (historyDialogOpen && selectedCustomerId && selectedCustomerId !== '0') {
+        setLoadingHistory(true);
+        try {
+          const res = await fetch(`/api/customers/${encodeURIComponent(selectedCustomerId)}`);
+          if (res.ok) {
+            const customerDetail: Customer = await res.json();
+            setCustomerPurchases(customerDetail.purchaseHistory || []);
+            setCustomers(prev => prev.map(c => c.id === selectedCustomerId ? { ...c, ...customerDetail } : c));
+          }
+        } catch (err) {
+          console.error('Error loading customer history:', err);
+        } finally {
+          setLoadingHistory(false);
+        }
+      }
+    }
+    loadCustomerHistory();
+  }, [historyDialogOpen, selectedCustomerId]);
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products.slice(0, 50); // Show first 50 products by default
@@ -1583,30 +1606,62 @@ function TPVContent() {
        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Historial de Compras: {selectedCustomer.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Historial de Compras: {selectedCustomer.name}
+            </DialogTitle>
             <DialogDescription>
-              Aquí puedes ver todas las facturas y productos comprados por este cliente.
+              Facturas históricas y productos comprados por este cliente en Diferacsa.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-              <ScrollArea className="h-[400px] px-4">
-                {(selectedCustomer.purchaseHistory?.length ?? 0) > 0 ? (
-                  <Accordion type="single" collapsible>
-                    {selectedCustomer.purchaseHistory.map(purchase => (
-                      <AccordionItem value={purchase.invoice} key={purchase.invoice}>
-                        <AccordionTrigger className="text-sm hover:no-underline py-2">
-                          <div className="flex justify-between w-full pr-2">
-                              <span>{purchase.invoice} - {format(new Date(purchase.date), 'dd/MM/yyyy')}</span>
-                              <span>{purchase.total}</span>
+          <div className="py-2">
+            {loadingHistory ? (
+              <div className="h-[280px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-sm">Consultando facturas históricas en la base de datos...</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-2">
+                {customerPurchases.length > 0 ? (
+                  <Accordion type="single" collapsible className="space-y-2">
+                    {customerPurchases.map((purchase) => (
+                      <AccordionItem 
+                        value={purchase.invoice} 
+                        key={purchase.invoice}
+                        className="border rounded-xl px-3 py-1 bg-card/60 shadow-xs"
+                      >
+                        <AccordionTrigger className="text-sm hover:no-underline py-2.5">
+                          <div className="flex items-center justify-between w-full pr-3 text-left">
+                            <div>
+                              <span className="font-bold text-foreground">Factura #{purchase.invoice}</span>
+                              <span className="text-xs text-muted-foreground ml-2">({purchase.date})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={purchase.status === 'Pagado' ? 'secondary' : 'outline'} className="text-[10px]">
+                                {purchase.status || 'Pagado'}
+                              </Badge>
+                              <span className="font-bold text-primary font-mono">{purchase.total}</span>
+                            </div>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent>
+                        <AccordionContent className="pt-1 pb-3">
                           <Table>
+                            <TableHeader>
+                              <TableRow className="border-b text-[11px] text-muted-foreground">
+                                <TableHead className="h-7 py-0">Producto</TableHead>
+                                <TableHead className="h-7 py-0 text-center w-20">Cant.</TableHead>
+                                <TableHead className="h-7 py-0 text-right w-24">Precio</TableHead>
+                              </TableRow>
+                            </TableHeader>
                             <TableBody>
                               {purchase.products.map((p, i) => (
-                                <TableRow key={i}>
-                                  <TableCell className="py-1 text-xs">{p.name}</TableCell>
-                                  <TableCell className="py-1 text-xs text-right">{p.qty}</TableCell>
+                                <TableRow key={i} className="border-b/50">
+                                  <TableCell className="py-1.5 text-xs font-medium">
+                                    <p className="leading-tight">{p.name}</p>
+                                    <p className="text-[10px] font-mono text-muted-foreground">{p.sku}</p>
+                                  </TableCell>
+                                  <TableCell className="py-1.5 text-xs text-center font-bold">{p.qty}</TableCell>
+                                  <TableCell className="py-1.5 text-xs text-right font-mono">Q{Number(p.price || 0).toFixed(2)}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -1616,11 +1671,18 @@ function TPVContent() {
                     ))}
                   </Accordion>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">Sin historial de compras.</p>
+                  <div className="py-12 text-center text-muted-foreground">
+                    <p className="font-semibold text-sm">Sin historial de compras registrado.</p>
+                    <p className="text-xs mt-1">Este cliente no registra facturas previas en la base de datos.</p>
+                  </div>
                 )}
               </ScrollArea>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+            <span className="text-xs text-muted-foreground">
+              {customerPurchases.length > 0 && `${customerPurchases.length} factura(s) encontrada(s)`}
+            </span>
             <Button type="button" variant="secondary" onClick={() => setHistoryDialogOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
