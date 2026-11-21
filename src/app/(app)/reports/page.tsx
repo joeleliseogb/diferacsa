@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useTransition, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   TrendingUp,
@@ -20,6 +21,7 @@ import {
   CreditCard,
   Building2,
   Download,
+  FileDown,
   Printer,
   RefreshCw,
   BarChart3,
@@ -347,12 +349,399 @@ function ProductSearchCombobox({
   );
 }
 
+interface PrintableReportsDocumentProps {
+  data: ReportData;
+  period: string;
+}
+
+const getPeriodLabel = (p: string) => {
+  switch (p) {
+    case 'all': return 'Histórico Completo (2009–2026)';
+    case '2026': return 'Año Fiscal 2026';
+    case '2025': return 'Año Fiscal 2025';
+    case '2024': return 'Año Fiscal 2024';
+    case '2023': return 'Año Fiscal 2023';
+    case '2022': return 'Año Fiscal 2022';
+    case '12months': return 'Últimos 12 Meses';
+    default: return `Período Fiscal ${p}`;
+  }
+};
+
+const PrintableReportsDocument = React.forwardRef<HTMLDivElement, PrintableReportsDocumentProps>(
+  ({ data, period }, ref) => {
+    const periodLabel = getPeriodLabel(period);
+    const currentDate = new Date().toLocaleDateString('es-GT', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const currentTime = new Date().toLocaleTimeString('es-GT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return (
+      <div
+        ref={ref}
+        style={{
+          width: '840px',
+          backgroundColor: '#ffffff',
+          color: '#0f172a',
+          fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        }}
+        className="p-8 space-y-6"
+      >
+        {/* Barra superior decorativa con acento corporativo Diferacsa */}
+        <div style={{ height: '6px', width: '100%', background: 'linear-gradient(90deg, #1E2538 0%, #1E2538 70%, #FF5722 70%, #FF5722 100%)', borderRadius: '4px' }} />
+
+        {/* Encabezado con Membrete y Branding Oficial */}
+        <div className="flex items-start justify-between pb-5 border-b-2 border-slate-200">
+          {/* Logo y Nombre de Empresa */}
+          <div className="flex items-center gap-3.5">
+            <div
+              style={{
+                width: '54px',
+                height: '54px',
+                backgroundColor: '#1E2538',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontWeight: 900,
+                fontSize: '28px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              }}
+            >
+              D
+            </div>
+            <div>
+              <div style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.5px' }}>
+                <span style={{ color: '#1E2538' }}>Difer</span>
+                <span style={{ color: '#FF5722' }}>acsa</span>
+              </div>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: '#334155', letterSpacing: '1px', textTransform: 'uppercase', marginTop: '2px' }}>
+                Ferretería González
+              </p>
+              <p style={{ fontSize: '11px', color: '#64748b' }}>
+                Materiales de Construcción & Soluciones de Gestión Integral
+              </p>
+            </div>
+          </div>
+
+          {/* Datos de Membrete Fiscal */}
+          <div className="text-[11px] text-slate-600 space-y-0.5 border-l-2 border-slate-200 pl-4 py-0.5">
+            <p><strong className="text-slate-800">NIT:</strong> 5489119-1</p>
+            <p><strong className="text-slate-800">PBX / Tel:</strong> (502) 7770-3362</p>
+            <p><strong className="text-slate-800">Dirección:</strong> Tacaná, San Marcos, Guatemala</p>
+            <p><strong className="text-slate-800">Sucursal:</strong> Casa Matriz • Terminal FACA-1251</p>
+          </div>
+
+          {/* Ficha de Metadatos del Informe */}
+          <div
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '8px 12px',
+              textAlign: 'right',
+              minWidth: '200px',
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '9px',
+                fontWeight: 800,
+                fontFamily: 'monospace',
+                textTransform: 'uppercase',
+                backgroundColor: '#1E2538',
+                color: '#ffffff',
+                marginBottom: '4px',
+              }}
+            >
+              INFORME OFICIAL AUDITADO
+            </span>
+            <h2 style={{ fontSize: '12px', fontWeight: 900, color: '#1E2538', textTransform: 'uppercase' }}>
+              Reporte de Gestión
+            </h2>
+            <p style={{ fontSize: '11px', color: '#334155', fontWeight: 600 }}>
+              {periodLabel}
+            </p>
+            <p style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>
+              {currentDate} • {currentTime}
+            </p>
+          </div>
+        </div>
+
+        {/* Resumen Ejecutivo - 4 KPIs Corporativos */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            I. Resumen Financiero y Operativo
+          </h3>
+          <div className="grid grid-cols-4 gap-3">
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '4px solid #1E2538', borderRadius: '8px', padding: '10px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ventas Totales</span>
+              <p style={{ fontSize: '16px', fontWeight: 900, color: '#1E2538', marginTop: '2px', fontFamily: 'monospace' }}>
+                Q{data.summary.totalSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+              </p>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{data.summary.salesCount.toLocaleString('es-GT')} facturas emitidas</span>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '4px solid #FF5722', borderRadius: '8px', padding: '10px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Cuentas por Cobrar</span>
+              <p style={{ fontSize: '16px', fontWeight: 900, color: '#FF5722', marginTop: '2px', fontFamily: 'monospace' }}>
+                Q{data.summary.totalReceivable.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+              </p>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{data.summary.debtorsCount} clientes con saldo</span>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', borderRadius: '8px', padding: '10px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Existencias Físicas</span>
+              <p style={{ fontSize: '16px', fontWeight: 900, color: '#0284c7', marginTop: '2px', fontFamily: 'monospace' }}>
+                {data.summary.totalUnitsInStock.toLocaleString('es-GT')}
+              </p>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{data.summary.totalCatalogProducts.toLocaleString('es-GT')} artículos registrados</span>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '4px solid #7c3aed', borderRadius: '8px', padding: '10px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Compras Totales</span>
+              <p style={{ fontSize: '16px', fontWeight: 900, color: '#7c3aed', marginTop: '2px', fontFamily: 'monospace' }}>
+                Q{data.summary.totalPurchases.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+              </p>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{data.summary.purchaseCount} comprobantes recibidos</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Desglose de Ventas por Modalidad de Pago */}
+        <div style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px' }}>
+          <div className="flex items-center justify-between text-xs">
+            <span style={{ fontWeight: 800, color: '#1E2538' }}>Distribución de Ingresos:</span>
+            <div className="flex items-center gap-5">
+              <span><strong>Contado:</strong> Q{data.summary.cashSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ({100 - data.summary.creditSalesPct}%)</span>
+              <span><strong>Crédito:</strong> Q{data.summary.creditSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })} ({data.summary.creditSalesPct}%)</span>
+              <span><strong>Ticket Promedio:</strong> Q{data.summary.averageTicket.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sección II: Comparativa por Familias de Productos (10 Categorías) */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            II. Desglose y Cuota por Familias de Productos (Categorías)
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', width: '30px', textAlign: 'center' }}>#</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538' }}>Familia / Categoría</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Artículos</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Unidades Vendidas</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Stock en Bodega</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Total Facturado (Q)</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Cuota (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.categoryComparison || []).map((cat, idx) => (
+                <tr key={cat.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', fontWeight: 700, color: '#0f172a' }}>{cat.name}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>{cat.productCount}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>{cat.unitsSold.toLocaleString('es-GT')}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>{cat.inStock.toLocaleString('es-GT')}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: '#1E2538', fontFamily: 'monospace' }}>
+                    Q{cat.totalSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 800, color: '#FF5722', fontFamily: 'monospace' }}>
+                    {cat.percentage}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sección III: Desempeño Comercial del Equipo de Ventas / Cajeros */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            III. Desempeño del Equipo de Ventas y Cajeros
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', width: '30px', textAlign: 'center' }}>#</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538' }}>Vendedor / Cajero</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Facturas</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Ticket Promedio</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Ventas Contado (Q)</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Ventas Crédito (Q)</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Total Facturado (Q)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.salespeopleComparison || []).slice(0, 10).map((sp, idx) => (
+                <tr key={sp.name} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', fontWeight: 700, color: '#0f172a' }}>{sp.name}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>{sp.invoiceCount.toLocaleString('es-GT')}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>Q{sp.averageTicket.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>Q{sp.cashSales.toLocaleString('es-GT', { minimumFractionDigits: 0 })}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>Q{sp.creditSales.toLocaleString('es-GT', { minimumFractionDigits: 0 })}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: '#1E2538', fontFamily: 'monospace' }}>
+                    Q{sp.totalSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sección IV: Evolución por Periodos Fiscales Históricos (YoY) */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            IV. Crecimiento Interanual por Períodos Fiscales (YoY)
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Año Fiscal</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Comprobantes</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Ticket Promedio</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Total Facturado (Q)</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Crecimiento Anual (% YoY)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.fiscalPeriodsComparison || []).slice(-8).map((fy, idx) => (
+                <tr key={fy.fiscalYear} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 800, color: '#1E2538' }}>{fy.fiscalYear}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>{fy.invoiceCount.toLocaleString('es-GT')}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>Q{fy.averageTicket.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                    Q{fy.totalSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 800, fontFamily: 'monospace', color: fy.growthPct >= 0 ? '#10b981' : '#ef4444' }}>
+                    {fy.growthPct > 0 ? `+${fy.growthPct}%` : `${fy.growthPct}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sección V: Top 10 Productos Más Vendidos */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            V. Top 10 Productos de Mayor Demanda Histórica
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', width: '30px', textAlign: 'center' }}>#</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', width: '90px' }}>SKU</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538' }}>Descripción del Artículo</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center', width: '90px' }}>Stock Bodega</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right', width: '110px' }}>Unidades Vendidas</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right', width: '120px' }}>Total Facturado (Q)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.topProducts || []).slice(0, 10).map((prod, idx) => (
+                <tr key={prod.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', fontFamily: 'monospace', fontWeight: 600 }}>{prod.sku}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', fontWeight: 600, color: '#0f172a' }}>{prod.name}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>
+                    {prod.inStock > 0 ? `${prod.inStock.toLocaleString('es-GT')} disp.` : 'Agotado'}
+                  </td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' }}>{prod.qtySold.toLocaleString('es-GT')}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: '#1E2538', fontFamily: 'monospace' }}>
+                    Q{prod.totalAmount.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sección VI: Abastecimiento y Principales Proveedores */}
+        <div>
+          <h3 style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1E2538', marginBottom: '8px' }}>
+            VI. Abastecimiento y Principales Proveedores Comerciales
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#1E2538', color: '#ffffff' }}>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', width: '30px', textAlign: 'center' }}>#</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538' }}>Proveedor</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>NIT</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'center' }}>Compras</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Total Comprado (Q)</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #1E2538', textAlign: 'right' }}>Participación (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.supplierComparison || []).slice(0, 6).map((sup, idx) => (
+                <tr key={sup.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', fontWeight: 700, color: '#0f172a' }}>{sup.name}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>{sup.nit}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>{sup.purchaseCount}</td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: '#1E2538', fontFamily: 'monospace' }}>
+                    Q{sup.totalPurchased.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td style={{ padding: '5px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 800, color: '#FF5722', fontFamily: 'monospace' }}>
+                    {sup.percentage}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sección de Validación, Firmas y Membrete de Cierre */}
+        <div style={{ paddingTop: '20px', marginTop: '20px', borderTop: '2px solid #e2e8f0' }}>
+          <div className="grid grid-cols-2 gap-12 pb-6">
+            <div className="text-center">
+              <div style={{ height: '50px', borderBottom: '1px solid #94a3b8', marginBottom: '8px' }} />
+              <p style={{ fontSize: '11px', fontWeight: 800, color: '#1E2538' }}>Firma y Sello de Autorización</p>
+              <p style={{ fontSize: '10px', color: '#64748b' }}>Gerencia General • Diferacsa</p>
+            </div>
+            <div className="text-center">
+              <div style={{ height: '50px', borderBottom: '1px solid #94a3b8', marginBottom: '8px' }} />
+              <p style={{ fontSize: '11px', fontWeight: 800, color: '#1E2538' }}>Firma y Sello de Conformidad</p>
+              <p style={{ fontSize: '10px', color: '#64748b' }}>Auditoría Contable & Finanzas</p>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '10px', textAlign: 'center', fontSize: '10px', color: '#64748b', lineHeight: 1.5 }}>
+            <p style={{ fontWeight: 600, color: '#334155' }}>
+              Este documento es un informe ejecutivo oficial emitido por el sistema ERP Diferacsa. Toda la información contenida es confidencial y para uso exclusivo de la administración de Ferretería González.
+            </p>
+            <p style={{ marginTop: '2px' }}>
+              Diferacsa - Ferretería González • Tacaná, San Marcos, Guatemala • PBX: (502) 7770-3362 • www.diferacsa.com
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+PrintableReportsDocument.displayName = 'PrintableReportsDocument';
+
 export default function ReportsPage() {
   const [period, setPeriod] = useState<string>('all');
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('resumen');
   const [, startTransition] = useTransition();
+  const { toast } = useToast();
+  const printableReportRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
 
   // Estados para el Comparador Interactivo de 2 Productos
   const [productAId, setProductAId] = useState<string>('');
@@ -384,6 +773,77 @@ export default function ReportsPage() {
       handleSelectProductA(catalogItem);
     } else {
       handleSelectProductB(catalogItem);
+    }
+  };
+
+  // Descarga de Reporte Ejecutivo en PDF con Membrete y Branding Oficial
+  const handleDownloadPDF = async () => {
+    if (!printableReportRef.current || !data) {
+      toast({
+        title: "No hay datos para exportar",
+        description: "Espere a que las estadísticas del reporte terminen de cargar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    toast({
+      title: "Generando PDF oficial...",
+      description: "Preparando documento con membrete, logotipo y métricas corporativas.",
+    });
+
+    try {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const jspdfModule = await import('jspdf');
+      const jsPDF = jspdfModule.default || jspdfModule.jsPDF;
+
+      const element = printableReportRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = position - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pdfHeight;
+      }
+
+      const periodClean = period.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `Diferacsa_Reporte_Ejecutivo_${periodClean}_${dateStr}.pdf`;
+      pdf.save(filename);
+
+      toast({
+        title: "Reporte PDF descargado",
+        description: `El archivo ${filename} se ha descargado correctamente.`,
+      });
+    } catch (error) {
+      console.error('Error al generar PDF de reporte:', error);
+      toast({
+        title: "Error al generar PDF",
+        description: "Ocurrió un inconveniente al generar el documento. Intente de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -541,12 +1001,22 @@ export default function ReportsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.print()}
-            className="h-9 gap-1.5 text-xs font-semibold rounded-xl border-border/70 bg-card hover:bg-muted/70"
-            title="Imprimir reporte"
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF || loading}
+            className="h-9 gap-1.5 text-xs font-semibold rounded-xl border-border/70 bg-card hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors shadow-xs"
+            title="Descargar reporte oficial en formato PDF con logotipo, membrete y branding de Diferacsa"
           >
-            <Printer className="h-4 w-4 text-muted-foreground" />
-            <span>Imprimir</span>
+            {isGeneratingPDF ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span>Generando PDF...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <span>Descargar PDF</span>
+              </>
+            )}
           </Button>
 
           <Button
@@ -1601,6 +2071,11 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Contenedor Oculto para Generación de PDF con Membrete y Branding Oficial */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', pointerEvents: 'none' }} aria-hidden="true">
+        {data && <PrintableReportsDocument ref={printableReportRef} data={data} period={period} />}
+      </div>
     </div>
   );
 }
