@@ -352,9 +352,14 @@ function ProductSearchCombobox({
 interface PrintableReportsDocumentProps {
   data: ReportData;
   period: string;
+  startDate?: string;
+  endDate?: string;
 }
 
-const getPeriodLabel = (p: string) => {
+const getPeriodLabel = (p: string, start?: string, end?: string) => {
+  if (p === 'custom' && start && end) {
+    return `Del ${start} al ${end}`;
+  }
   switch (p) {
     case 'all': return 'Histórico Completo (2009–2026)';
     case '2026': return 'Año Fiscal 2026';
@@ -362,14 +367,19 @@ const getPeriodLabel = (p: string) => {
     case '2024': return 'Año Fiscal 2024';
     case '2023': return 'Año Fiscal 2023';
     case '2022': return 'Año Fiscal 2022';
+    case 'this_month': return 'Mes Actual (Mayo 2026)';
+    case 'last_month': return 'Mes Anterior (Abril 2026)';
+    case 'last_30_days': return 'Últimos 30 Días';
+    case 'last_90_days': return 'Últimos 90 Días';
     case '12months': return 'Últimos 12 Meses';
+    case 'custom': return start && end ? `Del ${start} al ${end}` : 'Rango Personalizado';
     default: return `Período Fiscal ${p}`;
   }
 };
 
 const PrintableReportsDocument = React.forwardRef<HTMLDivElement, PrintableReportsDocumentProps>(
-  ({ data, period }, ref) => {
-    const periodLabel = getPeriodLabel(period);
+  ({ data, period, startDate, endDate }, ref) => {
+    const periodLabel = getPeriodLabel(period, startDate, endDate);
     const currentDate = new Date().toLocaleDateString('es-GT', {
       year: 'numeric',
       month: 'long',
@@ -735,6 +745,9 @@ PrintableReportsDocument.displayName = 'PrintableReportsDocument';
 
 export default function ReportsPage() {
   const [period, setPeriod] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('2026-01-01');
+  const [endDate, setEndDate] = useState<string>('2026-05-18');
+  const [showCustomRange, setShowCustomRange] = useState<boolean>(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('resumen');
@@ -826,7 +839,7 @@ export default function ReportsPage() {
         heightLeft -= pdfHeight;
       }
 
-      const periodClean = period.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const periodClean = period === 'custom' ? `${startDate}_al_${endDate}` : period.replace(/[^a-zA-Z0-9_-]/g, '_');
       const dateStr = new Date().toISOString().split('T')[0];
       const filename = `Diferacsa_Reporte_Ejecutivo_${periodClean}_${dateStr}.pdf`;
       pdf.save(filename);
@@ -847,10 +860,16 @@ export default function ReportsPage() {
     }
   };
 
-  const fetchReports = async (selectedPeriod: string) => {
+  const fetchReports = async (selectedPeriod: string, customStart?: string, customEnd?: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/reports?period=${encodeURIComponent(selectedPeriod)}`);
+      let url = `/api/reports?period=${encodeURIComponent(selectedPeriod)}`;
+      if (selectedPeriod === 'custom' || (customStart && customEnd)) {
+        const s = customStart || startDate;
+        const e = customEnd || endDate;
+        url += `&startDate=${encodeURIComponent(s)}&endDate=${encodeURIComponent(e)}`;
+      }
+      const res = await fetch(url);
       if (res.ok) {
         const json: ReportData = await res.json();
         setData(json);
@@ -869,12 +888,28 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchReports(period);
-  }, [period]);
+  }, []);
 
   const handlePeriodChange = (val: string) => {
     setPeriod(val);
+    if (val === 'custom') {
+      setShowCustomRange(true);
+      startTransition(() => {
+        fetchReports('custom', startDate, endDate);
+      });
+    } else {
+      setShowCustomRange(false);
+      startTransition(() => {
+        fetchReports(val);
+      });
+    }
+  };
+
+  const handleApplyCustomRange = () => {
+    setPeriod('custom');
+    setShowCustomRange(true);
     startTransition(() => {
-      fetchReports(val);
+      fetchReports('custom', startDate, endDate);
     });
   };
 
@@ -963,6 +998,17 @@ export default function ReportsPage() {
               <p className="text-sm text-muted-foreground">
                 Análisis comparativo entre familias, productos, proveedores, vendedores y períodos fiscales.
               </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-[11px] font-medium border-primary/40 text-primary bg-primary/5 gap-1.5 py-0.5">
+                  <Calendar className="h-3 w-3" />
+                  <span>Período: <strong>{getPeriodLabel(period, startDate, endDate)}</strong></span>
+                </Badge>
+                {data && (
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {data.summary.salesCount.toLocaleString('es-GT')} facturas • Total: <strong className="text-foreground">Q{data.summary.totalSales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</strong>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -972,20 +1018,36 @@ export default function ReportsPage() {
           <div className="flex items-center gap-1.5 bg-card border border-border/70 rounded-xl px-2.5 py-1 shadow-sm">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select value={period} onValueChange={handlePeriodChange}>
-              <SelectTrigger className="border-0 shadow-none h-8 w-[170px] text-xs font-semibold focus:ring-0">
+              <SelectTrigger className="border-0 shadow-none h-8 w-[190px] text-xs font-semibold focus:ring-0">
                 <SelectValue placeholder="Seleccionar Período" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Histórico Completo</SelectItem>
+                <SelectItem value="all">Histórico Completo (2009–2026)</SelectItem>
                 <SelectItem value="2026">Año 2026 (Actual)</SelectItem>
                 <SelectItem value="2025">Año 2025</SelectItem>
                 <SelectItem value="2024">Año 2024</SelectItem>
                 <SelectItem value="2023">Año 2023</SelectItem>
                 <SelectItem value="2022">Año 2022</SelectItem>
+                <SelectItem value="this_month">Mes Actual (Mayo 2026)</SelectItem>
+                <SelectItem value="last_month">Mes Anterior (Abril 2026)</SelectItem>
+                <SelectItem value="last_30_days">Últimos 30 Días</SelectItem>
+                <SelectItem value="last_90_days">Últimos 90 Días</SelectItem>
                 <SelectItem value="12months">Últimos 12 Meses</SelectItem>
+                <SelectItem value="custom">📅 Rango Personalizado...</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          <Button
+            variant={showCustomRange ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowCustomRange(!showCustomRange)}
+            className="h-9 gap-1.5 text-xs font-semibold rounded-xl border-border/70"
+            title="Abrir selector de rango de fechas personalizado"
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span className="hidden sm:inline">Rango</span>
+          </Button>
 
           <Button
             variant="outline"
@@ -1022,7 +1084,7 @@ export default function ReportsPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => fetchReports(period)}
+            onClick={() => fetchReports(period, startDate, endDate)}
             disabled={loading}
             className="h-9 w-9 rounded-xl hover:bg-muted/70"
             title="Recargar métricas"
@@ -1031,6 +1093,52 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Barra de Filtro por Rango de Fechas Personalizado */}
+      {(period === 'custom' || showCustomRange) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-card rounded-2xl border border-primary/30 shadow-xs animate-in fade-in duration-200 print:hidden">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4 text-primary" /> Filtrar por Rango Específico:
+            </span>
+            <div className="flex items-center gap-1.5">
+              <label className="text-muted-foreground text-[11px] font-medium">Desde:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-mono text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-muted-foreground text-[11px] font-medium">Hasta:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-mono text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleApplyCustomRange}
+              disabled={loading}
+              className="h-8 px-3 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              <span>Aplicar Rango</span>
+            </Button>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handlePeriodChange('all')}
+            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Restablecer a Histórico
+          </Button>
+        </div>
+      )}
 
       {/* 4 Tarjetas Métricas Principales (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -2074,7 +2182,15 @@ export default function ReportsPage() {
 
       {/* Contenedor Oculto para Generación de PDF con Membrete y Branding Oficial */}
       <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', pointerEvents: 'none' }} aria-hidden="true">
-        {data && <PrintableReportsDocument ref={printableReportRef} data={data} period={period} />}
+        {data && (
+          <PrintableReportsDocument
+            ref={printableReportRef}
+            data={data}
+            period={period}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        )}
       </div>
     </div>
   );

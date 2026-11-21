@@ -14,14 +14,60 @@ const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') || 'all'; // 'all', '2026', '2025', '2024', '12months'
+    const period = searchParams.get('period') || 'all'; // 'all', '2026', '2025', '2024', '12months', 'custom'
+    const startDateParam = searchParams.get('startDate') || '';
+    const endDateParam = searchParams.get('endDate') || '';
 
-    // Filtros de fecha dinámicos según el período
+    // Filtros de fecha dinámicos según el período o rango personalizado
     let invoiceDateFilter = '';
     let purchaseDateFilter = '';
     let trendQuery = '';
 
-    if (period === 'all') {
+    if (startDateParam && endDateParam) {
+      const startISO = `${startDateParam}T00:00:00Z`;
+      const endISO = `${endDateParam}T23:59:59Z`;
+      invoiceDateFilter = `AND date >= '${startISO}' AND date <= '${endISO}'`;
+      purchaseDateFilter = `AND date >= '${startISO}' AND date <= '${endISO}'`;
+
+      const startD = new Date(startDateParam);
+      const endD = new Date(endDateParam);
+      const diffDays = Math.ceil(Math.abs(endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 45) {
+        trendQuery = `
+          SELECT 
+            strftime('%Y-%m-%d', date) as label, 
+            count(*) as salesCount, 
+            round(sum(total), 2) as totalSales
+          FROM Invoice 
+          WHERE isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY label 
+          ORDER BY label ASC
+        `;
+      } else if (diffDays <= 730) {
+        trendQuery = `
+          SELECT 
+            strftime('%Y-%m', date) as label, 
+            count(*) as salesCount, 
+            round(sum(total), 2) as totalSales
+          FROM Invoice 
+          WHERE isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY label 
+          ORDER BY label ASC
+        `;
+      } else {
+        trendQuery = `
+          SELECT 
+            strftime('%Y', date) as label, 
+            count(*) as salesCount, 
+            round(sum(total), 2) as totalSales
+          FROM Invoice 
+          WHERE isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY label 
+          ORDER BY label ASC
+        `;
+      }
+    } else if (period === 'all') {
       trendQuery = `
         SELECT 
           strftime('%Y', date) as label, 
@@ -32,9 +78,48 @@ export async function GET(request: NextRequest) {
         GROUP BY label 
         ORDER BY label ASC
       `;
+    } else if (period === 'this_month') {
+      invoiceDateFilter = "AND date >= '2026-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
+      purchaseDateFilter = "AND date >= '2026-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
+      trendQuery = `
+        SELECT 
+          strftime('%Y-%m-%d', date) as label, 
+          count(*) as salesCount, 
+          round(sum(total), 2) as totalSales
+        FROM Invoice 
+        WHERE isCancelled = 0 ${invoiceDateFilter}
+        GROUP BY label 
+        ORDER BY label ASC
+      `;
+    } else if (period === 'last_month') {
+      invoiceDateFilter = "AND date >= '2026-04-01T00:00:00Z' AND date <= '2026-04-30T23:59:59Z'";
+      purchaseDateFilter = "AND date >= '2026-04-01T00:00:00Z' AND date <= '2026-04-30T23:59:59Z'";
+      trendQuery = `
+        SELECT 
+          strftime('%Y-%m-%d', date) as label, 
+          count(*) as salesCount, 
+          round(sum(total), 2) as totalSales
+        FROM Invoice 
+        WHERE isCancelled = 0 ${invoiceDateFilter}
+        GROUP BY label 
+        ORDER BY label ASC
+      `;
+    } else if (period === 'last_30_days') {
+      invoiceDateFilter = "AND date >= '2026-04-18T00:00:00Z' AND date <= '2026-05-18T23:59:59Z'";
+      purchaseDateFilter = "AND date >= '2026-04-18T00:00:00Z' AND date <= '2026-05-18T23:59:59Z'";
+      trendQuery = `
+        SELECT 
+          strftime('%Y-%m-%d', date) as label, 
+          count(*) as salesCount, 
+          round(sum(total), 2) as totalSales
+        FROM Invoice 
+        WHERE isCancelled = 0 ${invoiceDateFilter}
+        GROUP BY label 
+        ORDER BY label ASC
+      `;
     } else if (period === '12months') {
-      invoiceDateFilter = "AND date >= '2025-05-01T00:00:00Z'";
-      purchaseDateFilter = "AND date >= '2025-05-01T00:00:00Z'";
+      invoiceDateFilter = "AND date >= '2025-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
+      purchaseDateFilter = "AND date >= '2025-05-01T00:00:00Z' AND date <= '2026-05-31T23:59:59Z'";
       trendQuery = `
         SELECT 
           strftime('%Y-%m', date) as label, 
@@ -47,8 +132,8 @@ export async function GET(request: NextRequest) {
       `;
     } else {
       const targetYear = period.replace(/[^0-9]/g, '');
-      invoiceDateFilter = `AND strftime('%Y', date) = '${targetYear}'`;
-      purchaseDateFilter = `AND strftime('%Y', date) = '${targetYear}'`;
+      invoiceDateFilter = `AND date >= '${targetYear}-01-01T00:00:00Z' AND date <= '${targetYear}-12-31T23:59:59Z'`;
+      purchaseDateFilter = `AND date >= '${targetYear}-01-01T00:00:00Z' AND date <= '${targetYear}-12-31T23:59:59Z'`;
       trendQuery = `
         SELECT 
           strftime('%Y-%m', date) as label, 
@@ -131,12 +216,22 @@ export async function GET(request: NextRequest) {
           cat.id,
           cat.name, 
           count(DISTINCT p.id) as productCount, 
-          round(coalesce(sum(ii.quantity), 0), 0) as unitsSold, 
-          round(coalesce(sum(ii.total), 0), 2) as totalSales,
+          coalesce(sales.unitsSold, 0) as unitsSold, 
+          coalesce(sales.totalSales, 0) as totalSales,
           (SELECT coalesce(sum(ps.quantity), 0) FROM ProductStock ps JOIN Product p2 ON ps.productId = p2.id WHERE p2.categoryId = cat.id) as inStock
         FROM Category cat
         LEFT JOIN Product p ON p.categoryId = cat.id
-        LEFT JOIN InvoiceItem ii ON ii.productId = p.id
+        LEFT JOIN (
+          SELECT 
+            p.categoryId,
+            round(sum(ii.quantity), 0) as unitsSold,
+            round(sum(ii.total), 2) as totalSales
+          FROM Invoice inv
+          JOIN InvoiceItem ii ON ii.invoiceId = inv.id
+          JOIN Product p ON ii.productId = p.id
+          WHERE inv.isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY p.categoryId
+        ) sales ON sales.categoryId = cat.id
         GROUP BY cat.id
         ORDER BY totalSales DESC
       `),
@@ -190,10 +285,12 @@ export async function GET(request: NextRequest) {
           round(sum(ii.quantity), 0) as qtySold, 
           round(sum(ii.total), 2) as totalAmount,
           (SELECT coalesce(sum(ps.quantity), 0) FROM ProductStock ps WHERE ps.productId = p.id) as inStock
-        FROM InvoiceItem ii
+        FROM Invoice inv
+        JOIN InvoiceItem ii ON ii.invoiceId = inv.id
         JOIN Product p ON ii.productId = p.id
+        WHERE inv.isCancelled = 0 ${invoiceDateFilter}
         GROUP BY p.id
-        ORDER BY qtySold DESC
+        ORDER BY totalAmount DESC
         LIMIT 20
       `),
       // 12. Top Clientes
@@ -265,12 +362,19 @@ export async function GET(request: NextRequest) {
           p.id, 
           p.sku, 
           p.name, 
-          p.salesCount,
+          coalesce(sales.salesCount, 0) as salesCount,
           (SELECT coalesce(sum(ps.quantity), 0) FROM ProductStock ps WHERE ps.productId = p.id) as inStock,
           (SELECT coalesce(min(pp.price), 0) FROM ProductPrice pp WHERE pp.productId = p.id AND pp.tierName = 'Normal') as priceNormal,
           (SELECT coalesce(min(pp.price), 0) FROM ProductPrice pp WHERE pp.productId = p.id AND pp.tierName = 'Mayorista') as priceMayorista
         FROM Product p
-        ORDER BY p.salesCount DESC
+        LEFT JOIN (
+          SELECT ii.productId, round(sum(ii.quantity), 0) as salesCount
+          FROM Invoice inv
+          JOIN InvoiceItem ii ON ii.invoiceId = inv.id
+          WHERE inv.isCancelled = 0 ${invoiceDateFilter}
+          GROUP BY ii.productId
+        ) sales ON sales.productId = p.id
+        ORDER BY salesCount DESC
         LIMIT 500
       `),
     ]);
