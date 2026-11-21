@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Toaster } from "@/components/ui/toaster";
 import { ClientOnly } from '@/components/client-only';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -263,7 +264,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </header>
 
               {/* Contenido de la página */}
-              <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
+              <main className={cn(
+                "flex-1 overflow-y-auto overflow-x-hidden",
+                isSpecialView ? "p-2 sm:p-4 lg:p-6" : "p-4 sm:p-6 lg:p-7"
+              )}>
                 {children}
               </main>
             </div>

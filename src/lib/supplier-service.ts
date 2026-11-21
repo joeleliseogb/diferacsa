@@ -15,6 +15,23 @@ let memorySuppliers: Supplier[] = loadStore<Supplier[]>(SUPPLIERS_KEY, initialSu
 const persistSuppliers = () => saveStore(SUPPLIERS_KEY, memorySuppliers);
 
 export async function getSuppliers(searchTerm?: string): Promise<Supplier[]> {
+    try {
+        if (typeof window !== 'undefined') {
+            const query = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : '';
+            const res = await fetch(`/api/suppliers${query}`);
+            if (res.ok) {
+                const json = await res.json();
+                if (json.items) {
+                    memorySuppliers = json.items;
+                    persistSuppliers();
+                    return json.items;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Fallback to local suppliers:', e);
+    }
+
     let suppliers: Supplier[] = JSON.parse(JSON.stringify(memorySuppliers));
     if (searchTerm) {
         const lowercasedTerm = searchTerm.toLowerCase();
@@ -29,6 +46,17 @@ export async function getSuppliers(searchTerm?: string): Promise<Supplier[]> {
 }
 
 export async function getSupplier(id: string): Promise<Supplier | undefined> {
+    try {
+        if (typeof window !== 'undefined') {
+            const res = await fetch(`/api/suppliers/${encodeURIComponent(id)}`);
+            if (res.ok) {
+                const data: Supplier = await res.json();
+                return data;
+            }
+        }
+    } catch (e) {
+        console.warn('Fallback to local supplier by id:', e);
+    }
     const supplier = memorySuppliers.find(s => s.id === id);
     return supplier ? JSON.parse(JSON.stringify(supplier)) : undefined;
 }

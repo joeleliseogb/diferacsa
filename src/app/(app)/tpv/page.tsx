@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2 } from "lucide-react";
+import { Calculator, Users, Trash2, Save, PackagePlus, FilePlus, UserPlus, Wallet, Pencil, Check, ChevronsUpDown, History, Printer, HardHat, Info, Image as ImageIcon, LayoutGrid, List, FolderClock, Tag, CreditCard, Home, MapPin, Truck, Banknote, Building, Warehouse, HelpCircle, Terminal, ClipboardCheck, Loader2, ShoppingCart, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Customer, Order, Quote, Purchase, OrderProduct, QuoteProduct, Address, PaymentMethod, PriceTier, PurchaseProduct, ProductFamily, Tax, Reservation } from "@/lib/servicios";
 import type { Product } from "@/lib/product-data";
@@ -102,6 +102,17 @@ function TPVContent() {
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [productViewMode, setProductViewMode] = useState<ProductView>('grid');
+  const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
+  const [isCompactScreen, setIsCompactScreen] = useState(false);
+
+  useEffect(() => {
+    const checkScreen = () => {
+      setIsCompactScreen(window.innerWidth < 1024);
+    };
+    checkScreen();
+    window.addEventListener('resize', checkScreen);
+    return () => window.removeEventListener('resize', checkScreen);
+  }, []);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [priceTierDialogOpen, setPriceTierDialogOpen] = useState(false);
   const [parkedSalesDialogOpen, setParkedSalesDialogOpen] = useState(false);
@@ -1020,158 +1031,15 @@ function TPVContent() {
     setCart([...productsToAdd, advanceLine]);
     setIsCustomerReservationsOpen(false);
   }
-
-
-  return (
-    <>
-    <div className="flex flex-col gap-4 h-full">
-      <header className="flex-shrink-0 border-b pb-4">
-        <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-                {companyInfo?.logoUrl ? (
-                    <Image src={companyInfo.logoUrl} alt={companyInfo.name} width={40} height={40} className="rounded-md object-contain" />
-                ) : (
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-primary text-primary-foreground font-bold text-xl font-headline rounded-md">
-                        {companyInfo?.name.charAt(0) || 'S'}
-                    </div>
-                )}
-                <div>
-                    <h1 className="text-xl font-bold font-headline tracking-tight">{companyInfo?.name || 'SimplyGest'}</h1>
-                    <span className="font-mono text-sm text-muted-foreground">{nextInvoiceId}</span>
-                </div>
-            </div>
-             <div className="flex items-center gap-2 flex-wrap justify-end">
-                {(() => {
-                  const currentBranch = branches.find(b => b.id.toString() === selectedBranchId);
-                  const brConfig = getBranchConfig(currentBranch?.id || currentBranch?.name);
-                  const BrIcon = brConfig.Icon;
-                  return (
-                    <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                        <SelectTrigger className={cn(
-                            "h-9 px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all min-w-[160px] max-w-[220px]",
-                            brConfig.bg, brConfig.text, brConfig.border
-                        )}>
-                            <div className="flex items-center gap-2 truncate">
-                                <span className={cn("w-2 h-2 rounded-full shrink-0", brConfig.dot)} />
-                                <BrIcon className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate font-semibold">{brConfig.shortName}</span>
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {branches.map(b => {
-                                const bConf = getBranchConfig(b.id || b.name);
-                                const BIcon = bConf.Icon;
-                                return (
-                                    <SelectItem key={b.id} value={b.id.toString()} className="cursor-pointer">
-                                        <div className="flex items-center gap-2 py-0.5">
-                                            <span className={cn("w-2 h-2 rounded-full shrink-0", bConf.dot)} />
-                                            <BIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                            <div className="flex flex-col text-left">
-                                                <span className="font-semibold text-xs">{bConf.shortName}</span>
-                                                <span className="text-[10px] text-muted-foreground">{b.name}</span>
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                  );
-                })()}
-
-                {(() => {
-                  const currentWh = filteredWarehouses.find(w => w.id.toString() === selectedWarehouseId);
-                  const whConfig = getWarehouseConfig(currentWh?.id || currentWh?.name);
-                  const WhIcon = whConfig.Icon;
-                  return (
-                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
-                        <SelectTrigger className={cn(
-                            "h-9 px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all min-w-[175px] max-w-[240px]",
-                            whConfig.bg, whConfig.text, whConfig.border
-                        )}>
-                            <div className="flex items-center gap-2 truncate">
-                                <span className={cn("w-2 h-2 rounded-full shrink-0", whConfig.dot)} />
-                                <WhIcon className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate font-semibold">{whConfig.code}: {whConfig.shortName}</span>
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {filteredWarehouses.map(w => {
-                                const wConf = getWarehouseConfig(w.id || w.name);
-                                const WIcon = wConf.Icon;
-                                return (
-                                    <SelectItem key={w.id} value={w.id.toString()} className="cursor-pointer">
-                                        <div className="flex items-center gap-2 py-0.5">
-                                            <span className={cn("w-2 h-2 rounded-full shrink-0", wConf.dot)} />
-                                            <WIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                            <div className="flex flex-col text-left">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className={cn("px-1 py-0.2 rounded text-[9px] font-bold border", wConf.badgeClass)}>
-                                                        {wConf.code}
-                                                    </span>
-                                                    <span className="font-semibold text-xs">{wConf.shortName}</span>
-                                                </div>
-                                                <span className="text-[10px] text-muted-foreground">{w.name}</span>
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                  );
-                })()}
-                 <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" className="rounded-xl border-border/80 shadow-xs relative">
-                           <FolderClock className="mr-2 h-4 w-4" /> 
-                           Ventas Aparcadas {parkedSales.length > 0 && `(${parkedSales.length})`}
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Ventas Aparcadas</DialogTitle>
-                            <DialogDescription>Selecciona una venta para retomarla.</DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <ScrollArea className="h-64">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow><TableHead>Cliente</TableHead><TableHead>Vendedor</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Acción</TableHead></TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {parkedSales.length > 0 ? parkedSales.map(sale => (
-                                            <TableRow key={sale.id}>
-                                                <TableCell className="font-medium">{sale.customerName}</TableCell>
-                                                <TableCell>{sale.salespersonName}</TableCell>
-                                                <TableCell className="text-right">Q{sale.total.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right"><Button size="sm" onClick={() => handleResumeSale(sale)}>Retomar</Button></TableCell>
-                                            </TableRow>
-                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay ventas aparcadas.</TableCell></TableRow>}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-                <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="min-w-[150px] max-w-[200px] rounded-xl border-border/80 shadow-xs"><Terminal className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Terminal..." /></SelectTrigger>
-                    <SelectContent>{filteredTerminals.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
-        </div>
-      </header>
-      <main className="flex-grow min-h-0">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          <ResizablePanel defaultSize={66}>
-            <Card className="flex flex-col h-full m-0 rounded-r-none border-0 border-r">
-              <div className="p-4 border-b">
-                 <div className="flex justify-between items-center gap-4">
-                    <Input ref={productSearchRef} placeholder="Buscar producto por nombre o SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-grow"/>
-                     <div className="flex items-center gap-2">
+  const catalogCard = (
+    <Card className="flex flex-col h-full m-0 rounded-xl lg:rounded-r-none border border-border/60 lg:border-0 lg:border-r">
+              <div className="p-3 sm:p-4 border-b">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <Input ref={productSearchRef} placeholder="Buscar producto por nombre o SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full sm:flex-grow min-w-0 h-9 text-xs sm:text-sm"/>
+                     <div className="flex items-center gap-1.5 shrink-0 justify-between sm:justify-end">
                         <Dialog open={isNewProductModalOpen} onOpenChange={setIsNewProductModalOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline"><PackagePlus className="mr-2 h-4 w-4" /> Añadir Producto</Button>
+                                <Button variant="outline" size="sm" className="h-8 text-xs px-2.5"><PackagePlus className="mr-1.5 h-3.5 w-3.5" /> <span className="hidden sm:inline">Añadir </span>Producto</Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
                                 <DialogHeader>
@@ -1191,7 +1059,7 @@ function TPVContent() {
                         </Dialog>
                         <Dialog open={isGenericLineModalOpen} onOpenChange={setIsGenericLineModalOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="outline"><FilePlus className="mr-2 h-4 w-4" /> Añadir Línea</Button>
+                                <Button variant="outline" size="sm" className="h-8 text-xs px-2.5"><FilePlus className="mr-1.5 h-3.5 w-3.5" /> <span className="hidden sm:inline">Añadir </span>Línea</Button>
                             </DialogTrigger>
                              <DialogContent>
                                 <DialogHeader>
@@ -1209,14 +1077,14 @@ function TPVContent() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                    </div>
-                    <div className="flex items-center gap-1 rounded-md bg-muted p-1">
-                        <Button variant={productViewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => handleSetProductViewMode('grid')}>
-                            <LayoutGrid className="h-4 w-4"/>
-                        </Button>
-                         <Button variant={productViewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => handleSetProductViewMode('list')}>
-                            <List className="h-4 w-4"/>
-                        </Button>
+                        <div className="flex items-center gap-1 rounded-md bg-muted p-0.5">
+                            <Button variant={productViewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => handleSetProductViewMode('grid')}>
+                                <LayoutGrid className="h-3.5 w-3.5"/>
+                            </Button>
+                             <Button variant={productViewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => handleSetProductViewMode('list')}>
+                                <List className="h-3.5 w-3.5"/>
+                            </Button>
+                        </div>
                     </div>
                  </div>
               </div>
@@ -1346,23 +1214,23 @@ function TPVContent() {
                   </Table>
                 </div>
               )}
-            </Card>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={34}>
-            <Card className="h-full flex flex-col rounded-l-none border-0">
-              <CardHeader className="p-4">
+    </Card>
+  );
+
+  const cartCard = (
+    <Card className="h-full flex flex-col rounded-xl lg:rounded-l-none border border-border/60 lg:border-0">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
                 <div className="flex items-center justify-between gap-1.5 min-w-0">
                     <div className="flex items-center gap-1.5 flex-grow min-w-0">
                         <Users className="h-4 w-4 shrink-0 text-muted-foreground"/>
                         <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" aria-expanded={customerPopoverOpen} className="w-full justify-between min-w-0 h-9 px-2.5">
-                                    <span className="truncate text-left font-medium text-xs sm:text-sm">{selectedCustomer.name}</span>
+                                <Button variant="outline" role="combobox" aria-expanded={customerPopoverOpen} className="w-full justify-between min-w-0 h-8 sm:h-9 px-2">
+                                    <span className="truncate text-left font-medium text-xs sm:text-sm max-w-[110px] sm:max-w-none">{selectedCustomer.name}</span>
                                     <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[380px] p-0" align="end">
+                            <PopoverContent className="w-[92vw] sm:w-[380px] p-0" align="end">
                                 <Command shouldFilter={false}>
                                     <CommandInput 
                                         placeholder="Buscar por nombre, NIT, teléfono..." 
@@ -1467,10 +1335,10 @@ function TPVContent() {
                                 <Tooltip>
                                 <TooltipTrigger asChild>
                                     <DialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" disabled={selectedCustomerId === '0' || customerReservations.length === 0} className="h-8 w-8 shrink-0 relative">
-                                            <ClipboardCheck className="h-4 w-4"/>
+                                        <Button variant="ghost" size="icon" disabled={selectedCustomerId === '0' || customerReservations.length === 0} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 relative">
+                                            <ClipboardCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4"/>
                                             {customerReservations.length > 0 && (
-                                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{customerReservations.length}</span>
+                                                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-bold">{customerReservations.length}</span>
                                             )}
                                         </Button>
                                     </DialogTrigger>
@@ -1498,8 +1366,8 @@ function TPVContent() {
                          <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
-                                        <Link href={`/customers/new?redirect=/tpv`}><UserPlus className="h-4 w-4"/></Link>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" asChild>
+                                        <Link href={`/customers/new?redirect=/tpv`}><UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Link>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Añadir nuevo cliente</p></TooltipContent>
@@ -1508,8 +1376,8 @@ function TPVContent() {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild disabled={selectedCustomerId === '0'}>
-                                        <Link href={`/customers/${selectedCustomerId}/edit?redirect=/tpv`}><Pencil className="h-4 w-4"/></Link>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" asChild disabled={selectedCustomerId === '0'}>
+                                        <Link href={`/customers/${selectedCustomerId}/edit?redirect=/tpv`}><Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Link>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Editar cliente</p></TooltipContent>
@@ -1518,8 +1386,8 @@ function TPVContent() {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setHistoryDialogOpen(true)} disabled={selectedCustomerId === '0'}>
-                                        <History className="h-4 w-4" />
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" onClick={() => setHistoryDialogOpen(true)} disabled={selectedCustomerId === '0'}>
+                                        <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Ver historial del cliente</p></TooltipContent>
@@ -1587,31 +1455,31 @@ function TPVContent() {
                     </TooltipProvider>
                 </div>
               </CardHeader>
-              <CardContent className="flex-grow overflow-y-auto p-4">
+              <CardContent className="flex-grow overflow-y-auto p-2 sm:p-4">
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Producto</TableHead>
-                            <TableHead className="w-[100px]">Cant.</TableHead>
-                            <TableHead className="w-[100px] text-right">Subtotal</TableHead>
-                            <TableHead className="w-[20px]"></TableHead>
+                            <TableHead className="py-2 px-1 sm:px-2">Producto</TableHead>
+                            <TableHead className="w-[75px] sm:w-[90px] py-2 px-1 text-center">Cant.</TableHead>
+                            <TableHead className="w-[70px] sm:w-[85px] py-2 px-1 text-right">Subtotal</TableHead>
+                            <TableHead className="w-[28px] py-2 px-1 text-center"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {cart.length > 0 ? cart.map(item => (
                             <TableRow key={`${item.sku}-${item.warehouseId}`}>
-                                <TableCell className="font-medium text-xs leading-tight py-2">
-                                    {item.name}
-                                    <div className="text-muted-foreground flex items-center gap-1">
-                                        Q{item.price.toFixed(2)}
-                                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'price', item.price)}>
-                                            <Calculator className="h-3 w-3" />
+                                <TableCell className="font-medium text-xs leading-tight py-2 px-1 sm:px-2 min-w-0">
+                                    <span className="line-clamp-2">{item.name}</span>
+                                    <div className="text-muted-foreground flex items-center gap-1 text-[11px] mt-0.5">
+                                        <span>Q{item.price.toFixed(2)}</span>
+                                        <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'price', item.price)}>
+                                            <Calculator className="h-2.5 w-2.5" />
                                         </Button>
                                     </div>
                                     <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} className="mt-1" />
                                 </TableCell>
-                                <TableCell className="py-2">
-                                    <div className="flex items-center gap-1">
+                                <TableCell className="py-2 px-1 text-center">
+                                    <div className="flex items-center justify-center gap-0.5">
                                     <Input
                                         ref={el => { cartItemRefs.current.set(`${item.sku}-${item.warehouseId}`, el); }} 
                                         type="number"
@@ -1619,32 +1487,41 @@ function TPVContent() {
                                         value={item.qty} 
                                         onChange={e => handleUpdateCartItem(item.sku, item.warehouseId, 'qty', parseInt(e.target.value, 10))} 
                                         onKeyDown={handleCartQtyKeyDown}
-                                        className="h-8 w-20 text-center"/>
-                                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'qty', item.qty)}>
-                                        <Calculator className="h-3 w-3" />
+                                        className="h-7 w-11 sm:w-14 text-center text-xs px-0.5"/>
+                                     <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'qty', item.qty)}>
+                                        <Calculator className="h-2.5 w-2.5" />
                                     </Button>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-right font-mono text-xs py-2">Q{(item.price * item.qty).toFixed(2)}</TableCell>
-                                <TableCell className="py-2">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleUpdateCartItem(item.sku, item.warehouseId, 'qty', 0)}><Trash2 className="h-3 w-3"/></Button>
+                                <TableCell className="text-right font-mono text-xs py-2 px-1 whitespace-nowrap">Q{(item.price * item.qty).toFixed(2)}</TableCell>
+                                <TableCell className="py-2 px-1 text-center">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => handleUpdateCartItem(item.sku, item.warehouseId, 'qty', 0)}><Trash2 className="h-3.5 w-3.5"/></Button>
                                 </TableCell>
                             </TableRow>
                         )) : (
-                            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Carrito vacío</TableCell></TableRow>
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <span>Carrito vacío</span>
+                                  <Button variant="outline" size="sm" onClick={() => setMobileTab('products')} className="text-xs h-8 gap-1.5 lg:hidden">
+                                    <Package className="h-3.5 w-3.5" /> Ir al Catálogo
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
                         )}
                     </TableBody>
                 </Table>
               </CardContent>
-              <CardFooter className="flex flex-col gap-2 border-t pt-4 p-4">
+              <CardFooter className="flex flex-col gap-2 border-t pt-3 p-3 sm:p-4">
                  <div className="w-full flex justify-between items-center text-lg font-bold">
                     <span>TOTAL</span>
                     <span className="font-mono">Q{cartTotal.toFixed(2)}</span>
                  </div>
-                 <div className="w-full grid grid-cols-3 gap-2 pt-2">
+                 <div className="w-full flex flex-col gap-2 pt-1">
                     <Dialog open={isFinishSaleDialogOpen} onOpenChange={setIsFinishSaleDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button className="col-span-3">
+                            <Button className="w-full h-10 font-bold text-sm shadow-sm">
                                 <Wallet className="mr-2 h-4 w-4"/>Guardar Venta
                             </Button>
                         </DialogTrigger>
@@ -1687,14 +1564,246 @@ function TPVContent() {
                             </div>
                         </DialogContent>
                     </Dialog>
-                    <Button variant="outline" onClick={handleParkSale}><FolderClock className="mr-2 h-4 w-4"/>Aparcar</Button>
-                    <Button variant="secondary" onClick={handleCreateOrder}>P. a Domicilio</Button>
-                    <Button variant="secondary" onClick={handleSaveAsQuote}><FilePlus className="mr-2 h-4 w-4"/>Presupuesto</Button>
+                    <div className="grid grid-cols-3 gap-1.5 w-full">
+                      <Button variant="outline" size="sm" onClick={handleParkSale} className="px-1 text-xs truncate h-8.5 font-medium justify-center" title="Aparcar venta">
+                        <FolderClock className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Aparcar</span>
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleCreateOrder} className="px-1 text-xs truncate h-8.5 font-medium justify-center" title="Pedido a domicilio">
+                        <Truck className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Domicilio</span>
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleSaveAsQuote} className="px-1 text-xs truncate h-8.5 font-medium justify-center" title="Guardar como presupuesto">
+                        <FilePlus className="mr-1 h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Presupuesto</span>
+                      </Button>
+                    </div>
                  </div>
               </CardFooter>
-            </Card>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+    </Card>
+  );
+
+
+
+  return (
+    <>
+    <div className="flex flex-col gap-4 h-full">
+      <header className="flex-shrink-0 border-b pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+                {companyInfo?.logoUrl ? (
+                    <Image src={companyInfo.logoUrl} alt={companyInfo.name} width={40} height={40} className="rounded-md object-contain" />
+                ) : (
+                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-primary text-primary-foreground font-bold text-xl font-headline rounded-md">
+                        {companyInfo?.name.charAt(0) || 'S'}
+                    </div>
+                )}
+                <div>
+                    <h1 className="text-xl font-bold font-headline tracking-tight">{companyInfo?.name || 'SimplyGest'}</h1>
+                    <span className="font-mono text-sm text-muted-foreground">{nextInvoiceId}</span>
+                </div>
+            </div>
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto justify-end">
+                {(() => {
+                  const currentBranch = branches.find(b => b.id.toString() === selectedBranchId);
+                  const brConfig = getBranchConfig(currentBranch?.id || currentBranch?.name);
+                  const BrIcon = brConfig.Icon;
+                  return (
+                    <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+                        <SelectTrigger className={cn(
+                            "h-9 px-2.5 sm:px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all w-full sm:w-auto min-w-0 sm:min-w-[160px] sm:max-w-[220px]",
+                            brConfig.bg, brConfig.text, brConfig.border
+                        )}>
+                            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                                <span className={cn("w-2 h-2 rounded-full shrink-0", brConfig.dot)} />
+                                <BrIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate font-semibold">{brConfig.shortName}</span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {branches.map(b => {
+                                const bConf = getBranchConfig(b.id || b.name);
+                                const BIcon = bConf.Icon;
+                                return (
+                                    <SelectItem key={b.id} value={b.id.toString()} className="cursor-pointer">
+                                        <div className="flex items-center gap-2 py-0.5">
+                                            <span className={cn("w-2 h-2 rounded-full shrink-0", bConf.dot)} />
+                                            <BIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <div className="flex flex-col text-left">
+                                                <span className="font-semibold text-xs">{bConf.shortName}</span>
+                                                <span className="text-[10px] text-muted-foreground">{b.name}</span>
+                                            </div>
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                  );
+                })()}
+
+                {(() => {
+                  const currentWh = filteredWarehouses.find(w => w.id.toString() === selectedWarehouseId);
+                  const whConfig = getWarehouseConfig(currentWh?.id || currentWh?.name);
+                  const WhIcon = whConfig.Icon;
+                  return (
+                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
+                        <SelectTrigger className={cn(
+                            "h-9 px-2.5 sm:px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all w-full sm:w-auto min-w-0 sm:min-w-[175px] sm:max-w-[240px]",
+                            whConfig.bg, whConfig.text, whConfig.border
+                        )}>
+                            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                                <span className={cn("w-2 h-2 rounded-full shrink-0", whConfig.dot)} />
+                                <WhIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate font-semibold">{whConfig.code}: {whConfig.shortName}</span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {filteredWarehouses.map(w => {
+                                const wConf = getWarehouseConfig(w.id || w.name);
+                                const WIcon = wConf.Icon;
+                                return (
+                                    <SelectItem key={w.id} value={w.id.toString()} className="cursor-pointer">
+                                        <div className="flex items-center gap-2 py-0.5">
+                                            <span className={cn("w-2 h-2 rounded-full shrink-0", wConf.dot)} />
+                                            <WIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <div className="flex flex-col text-left">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={cn("px-1 py-0.2 rounded text-[9px] font-bold border", wConf.badgeClass)}>
+                                                        {wConf.code}
+                                                    </span>
+                                                    <span className="font-semibold text-xs">{wConf.shortName}</span>
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground">{w.name}</span>
+                                            </div>
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                  );
+                })()}
+                 <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" className="rounded-xl border-border/80 shadow-xs relative w-full sm:w-auto h-9 px-2.5 text-xs truncate justify-center">
+                           <FolderClock className="mr-1.5 h-3.5 w-3.5 shrink-0" /> 
+                           <span className="truncate">Aparcadas {parkedSales.length > 0 && `(${parkedSales.length})`}</span>
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Ventas Aparcadas</DialogTitle>
+                            <DialogDescription>Selecciona una venta para retomarla.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <ScrollArea className="h-64">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow><TableHead>Cliente</TableHead><TableHead>Vendedor</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Acción</TableHead></TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {parkedSales.length > 0 ? parkedSales.map(sale => (
+                                            <TableRow key={sale.id}>
+                                                <TableCell className="font-medium">{sale.customerName}</TableCell>
+                                                <TableCell>{sale.salespersonName}</TableCell>
+                                                <TableCell className="text-right">Q{sale.total.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right"><Button size="sm" onClick={() => handleResumeSale(sale)}>Retomar</Button></TableCell>
+                                            </TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay ventas aparcadas.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
+                    <SelectTrigger className="w-full sm:w-auto min-w-0 sm:min-w-[150px] sm:max-w-[200px] h-9 rounded-xl border-border/80 shadow-xs text-xs px-2.5">
+                        <div className="flex items-center gap-1.5 truncate">
+                            <Terminal className="h-3.5 w-3.5 shrink-0" />
+                            <SelectValue placeholder="Terminal..." />
+                        </div>
+                    </SelectTrigger>
+                    <SelectContent>{filteredTerminals.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}</SelectContent>
+                </Select>
+            </div>
+        </div>
+      </header>
+      <main className="flex-grow min-h-0 flex flex-col">
+        {isCompactScreen ? (
+          <div className="flex flex-col h-full gap-2.5">
+            {/* Selector de pestañas móvil (< lg) */}
+            <div className="flex items-center p-1 bg-muted/80 rounded-xl gap-1 shrink-0 border">
+              <button
+                type="button"
+                onClick={() => setMobileTab('products')}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all",
+                  mobileTab === 'products' ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Package className="h-4 w-4" />
+                <span>Catálogo ({filteredProducts.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileTab('cart')}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all relative",
+                  mobileTab === 'cart' ? "bg-background text-foreground shadow-xs font-bold" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                <span>Carrito ({cart.length > 0 ? `${cart.length} • Q${cartTotal.toFixed(2)}` : 'Vacío'})</span>
+                {cart.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </button>
+            </div>
+
+            {/* Vista activa en móvil */}
+            <div className="flex-grow min-h-0 relative">
+              {mobileTab === 'products' ? (
+                <>
+                  <div className={cn("h-full", cart.length > 0 && "pb-16")}>
+                    {catalogCard}
+                  </div>
+                  {cart.length > 0 && (
+                    <div className="fixed bottom-3 left-3 right-3 z-30">
+                      <Button
+                        onClick={() => setMobileTab('cart')}
+                        className="w-full h-12 shadow-xl rounded-xl flex items-center justify-between px-4 bg-primary text-primary-foreground font-semibold"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShoppingCart className="h-5 w-5" />
+                          <span>{cart.length} {cart.length === 1 ? 'producto' : 'productos'} ({cart.reduce((sum, i) => sum + i.qty, 0)} uds)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold">Q{cartTotal.toFixed(2)}</span>
+                          <span className="text-xs bg-primary-foreground/20 px-2.5 py-1 rounded-md">Ver Carrito →</span>
+                        </div>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="h-full">
+                  {cartCard}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={66}>
+              {catalogCard}
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={34}>
+              {cartCard}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </main>
     </div>
       
