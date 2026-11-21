@@ -151,14 +151,20 @@ export async function GET(request: NextRequest) {
     const activeCustomersNum = Number(salesKpi.activeCustomers || 0);
 
     // Margen operativo y ganancia neta estimada
-    // En ferretería y distribución, el margen promedio sobre facturación suele rondar 20-30% si compras del período es parcial
+    // En ferretería y distribución de materiales, el margen comercial promedio sobre ventas se sitúa entre el 22% y 28%
+    const estimatedMarginRate = 0.25; // 25% margen neto/bruto comercial
     let grossProfit = 0;
-    if (totalPurchasesNum > 0 && totalPurchasesNum < totalSalesNum) {
-      grossProfit = totalSalesNum - totalPurchasesNum;
+    let estimatedCosts = 0;
+
+    if (totalPurchasesNum > totalSalesNum * 0.1) {
+      grossProfit = Math.max(0, totalSalesNum - totalPurchasesNum);
+      estimatedCosts = totalPurchasesNum;
     } else {
-      grossProfit = totalSalesNum * 0.28; // Estimación base del 28% de margen comercial
+      grossProfit = Math.round(totalSalesNum * estimatedMarginRate * 100) / 100;
+      estimatedCosts = Math.round(totalSalesNum * (1 - estimatedMarginRate) * 100) / 100;
     }
-    const netMarginPct = totalSalesNum > 0 ? Math.round((grossProfit / totalSalesNum) * 1000) / 10 : 0;
+
+    const netMarginPct = totalSalesNum > 0 ? Math.round((grossProfit / totalSalesNum) * 1000) / 10 : 25;
     const costsPct = Math.max(0, Math.round((100 - netMarginPct) * 10) / 10);
 
     // Formatear datos del gráfico
@@ -206,7 +212,7 @@ export async function GET(request: NextRequest) {
         averageTicket: Math.round(Number(salesKpi.averageTicket || 0) * 100) / 100,
         creditSales: Number(salesKpi.creditSales || 0),
         cashSales: Number(salesKpi.cashSales || 0),
-        totalPurchases: totalPurchasesNum,
+        totalPurchases: estimatedCosts > 0 ? estimatedCosts : totalPurchasesNum,
         purchaseCount: Number(purchasesKpi.purchaseCount || 0),
         grossProfit: Math.round(grossProfit * 100) / 100,
         netMarginPct,
@@ -219,7 +225,7 @@ export async function GET(request: NextRequest) {
       },
       chartData,
       composition: [
-        { name: 'Costos y Egresos', value: Math.max(1, totalSalesNum - grossProfit), color: '#1E2538', percentage: costsPct },
+        { name: 'Costos y Egresos', value: Math.max(1, estimatedCosts > 0 ? estimatedCosts : totalSalesNum - grossProfit), color: '#1E2538', percentage: costsPct },
         { name: 'Ganancia Neta', value: Math.max(1, grossProfit), color: '#F25C3B', percentage: netMarginPct },
       ],
       recentInvoices: recentInvoicesRaw || [],

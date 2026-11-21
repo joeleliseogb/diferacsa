@@ -23,20 +23,26 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={data}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
         <XAxis
           dataKey="name"
           stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
+          fontSize={11}
           tickLine={false}
           axisLine={false}
+          interval={0}
         />
         <YAxis
           stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
+          fontSize={11}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `Q${value}`}
+          width={65}
+          tickFormatter={(value) => {
+            if (value >= 1_000_000) return `Q${(value / 1_000_000).toFixed(1)}M`;
+            if (value >= 1_000) return `Q${(value / 1_000).toFixed(0)}k`;
+            return `Q${value}`;
+          }}
         />
         <Tooltip
           cursor={{ fill: 'hsl(var(--muted) / 0.4)', radius: 8 }}
@@ -49,7 +55,7 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
             fontSize: '12px',
             fontWeight: 500,
           }}
-          formatter={(value: number) => [`Q${value.toFixed(2)}`, 'Ingresos']}
+          formatter={(value: number) => [`Q${value.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Facturación']}
         />
         <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 4, 4]} maxBarSize={48} />
       </BarChart>
