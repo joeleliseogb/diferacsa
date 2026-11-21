@@ -1018,11 +1018,11 @@ function TPVContent() {
             </div>
              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Building className="h-4 w-4 mr-2" /><SelectValue placeholder="Sucursal..."/></SelectTrigger>
+                    <SelectTrigger className="min-w-[170px] max-w-[240px] rounded-xl border-border/80 shadow-xs"><Building className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Sucursal..."/></SelectTrigger>
                     <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}</SelectContent>
                 </Select>
                  <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Warehouse className="h-4 w-4 mr-2" /><SelectValue placeholder="Almacén..."/></SelectTrigger>
+                    <SelectTrigger className="min-w-[170px] max-w-[240px] rounded-xl border-border/80 shadow-xs"><Warehouse className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Almacén..."/></SelectTrigger>
                     <SelectContent>{filteredWarehouses.map(w => <SelectItem key={w.id} value={w.id.toString()}>{w.name}</SelectItem>)}</SelectContent>
                 </Select>
                  <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
@@ -1059,7 +1059,7 @@ function TPVContent() {
                     </DialogContent>
                 </Dialog>
                 <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="w-[180px] rounded-xl border-border/80 shadow-xs"><Terminal className="h-4 w-4 mr-2" /><SelectValue placeholder="Terminal..." /></SelectTrigger>
+                    <SelectTrigger className="min-w-[150px] max-w-[200px] rounded-xl border-border/80 shadow-xs"><Terminal className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Terminal..." /></SelectTrigger>
                     <SelectContent>{filteredTerminals.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}</SelectContent>
                 </Select>
             </div>
@@ -1234,14 +1234,14 @@ function TPVContent() {
           <ResizablePanel defaultSize={34}>
             <Card className="h-full flex flex-col rounded-l-none border-0">
               <CardHeader className="p-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-grow">
-                        <Users className="h-5 w-5"/>
+                <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-grow min-w-0">
+                        <Users className="h-4 w-4 shrink-0 text-muted-foreground"/>
                         <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" aria-expanded={customerPopoverOpen} className="w-full justify-between">
-                                    <span className="truncate">{selectedCustomer.name}</span>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                <Button variant="outline" role="combobox" aria-expanded={customerPopoverOpen} className="w-full justify-between min-w-0 h-9 px-2.5">
+                                    <span className="truncate text-left font-medium text-xs sm:text-sm">{selectedCustomer.name}</span>
+                                    <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[380px] p-0" align="end">
@@ -1343,16 +1343,16 @@ function TPVContent() {
                             </PopoverContent>
                         </Popover>
                     </div>
-                    <div className="flex items-center pl-1">
+                    <div className="flex items-center shrink-0 gap-0.5">
                         <TooltipProvider>
                             <Dialog open={isCustomerReservationsOpen} onOpenChange={setIsCustomerReservationsOpen}>
                                 <Tooltip>
                                 <TooltipTrigger asChild>
                                     <DialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" disabled={selectedCustomerId === '0' || customerReservations.length === 0} className="relative">
+                                        <Button variant="ghost" size="icon" disabled={selectedCustomerId === '0' || customerReservations.length === 0} className="h-8 w-8 shrink-0 relative">
                                             <ClipboardCheck className="h-4 w-4"/>
                                             {customerReservations.length > 0 && (
-                                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">{customerReservations.length}</span>
+                                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{customerReservations.length}</span>
                                             )}
                                         </Button>
                                     </DialogTrigger>
@@ -1380,7 +1380,9 @@ function TPVContent() {
                          <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" asChild><Link href={`/customers/new?redirect=/tpv`}><UserPlus className="h-4 w-4"/></Link></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
+                                        <Link href={`/customers/new?redirect=/tpv`}><UserPlus className="h-4 w-4"/></Link>
+                                    </Button>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Añadir nuevo cliente</p></TooltipContent>
                             </Tooltip>
@@ -1388,7 +1390,7 @@ function TPVContent() {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" asChild disabled={selectedCustomerId === '0'}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild disabled={selectedCustomerId === '0'}>
                                         <Link href={`/customers/${selectedCustomerId}/edit?redirect=/tpv`}><Pencil className="h-4 w-4"/></Link>
                                     </Button>
                                 </TooltipTrigger>
@@ -1398,7 +1400,7 @@ function TPVContent() {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => setHistoryDialogOpen(true)} disabled={selectedCustomerId === '0'}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setHistoryDialogOpen(true)} disabled={selectedCustomerId === '0'}>
                                         <History className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
