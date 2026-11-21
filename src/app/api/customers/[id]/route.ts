@@ -15,7 +15,14 @@ export async function GET(
         invoices: {
           take: 50,
           orderBy: { date: 'desc' },
-          include: { items: true },
+          include: {
+            items: true,
+            creditMovements: true,
+          },
+        },
+        creditMovements: {
+          take: 50,
+          orderBy: { date: 'desc' },
         },
       },
     });
@@ -53,7 +60,24 @@ export async function GET(
           price: it.price,
         };
       }),
+      payments: (inv.creditMovements || []).map((cm) => ({
+        date: cm.date.toISOString().split('T')[0],
+        amount: cm.credit,
+        method: cm.reason || 'Abono a Crédito',
+        documentNumber: cm.id,
+      })),
       branchId: inv.branchId,
+    }));
+
+    const creditHistory = (c.creditMovements || []).map((cm) => ({
+      id: cm.id,
+      date: cm.date.toISOString().split('T')[0],
+      reason: cm.reason || 'Movimiento de Crédito',
+      debit: cm.debit,
+      credit: cm.credit,
+      balance: cm.balance,
+      invoiceId: cm.invoiceId,
+      userName: cm.userName,
     }));
 
     const formatted: Customer = {
@@ -75,6 +99,7 @@ export async function GET(
       maxSalesDiscount: `${c.maxDiscount}%`,
       addresses: c.address ? [{ id: 1, street: c.address, city: 'Tacaná', isPrimary: true }] : [],
       purchaseHistory: purchases,
+      creditMovements: creditHistory,
       notes: '',
     };
 

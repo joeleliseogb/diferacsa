@@ -146,6 +146,17 @@ export interface RepairOrder {
 }
 
 
+export interface CreditMovement {
+  id: string;
+  date: string;
+  reason: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  invoiceId?: string | null;
+  userName?: string | null;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -165,6 +176,7 @@ export interface Customer {
   maxSalesDiscount: string;
   addresses: Address[];
   purchaseHistory: Purchase[];
+  creditMovements?: CreditMovement[];
   orders?: Order[];
   quotes?: Quote[];
   vouchers?: DiscountVoucher[];

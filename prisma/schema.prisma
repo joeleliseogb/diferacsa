@@ -119,6 +119,7 @@ model Customer {
   maxDiscount      Float     @default(0)
   priceTier        String    @default("Normal")
   invoices         Invoice[]
+  creditMovements  CustomerCreditMovement[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -161,6 +162,8 @@ model Invoice {
   isCancelled    Boolean       @default(false)
   cashierName    String?
   items          InvoiceItem[]
+  creditMovements CustomerCreditMovement[]
+  deliveries     Delivery[]
   createdAt      DateTime      @default(now())
 
   @@index([branchId])
@@ -176,6 +179,8 @@ model InvoiceItem {
   price      Float
   total      Float
   discount   Float    @default(0)
+  deliveryItems DeliveryItem[]
+  creditNotes   CreditNote[]
 
   @@index([productId])
   @@index([invoiceId])
@@ -249,4 +254,94 @@ model User {
   updatedAt DateTime @updatedAt
 
   @@index([branchId])
+}
+
+// ----------------------------------------------------
+// 6. UNIDADES DE MEDIDA Y CONVERSIONES
+// ----------------------------------------------------
+
+model UnitOfMeasure {
+  id          Int              @id
+  name        String           @unique
+  conversions UnitConversion[]
+}
+
+model UnitConversion {
+  id              Int           @id
+  name            String
+  factor          Float
+  unitOfMeasureId Int
+  unitOfMeasure   UnitOfMeasure @relation(fields: [unitOfMeasureId], references: [id], onDelete: Cascade)
+
+  @@index([unitOfMeasureId])
+}
+
+// ----------------------------------------------------
+// 7. ABONOS Y MOVIMIENTOS DE CRÉDITO DE CLIENTES
+// ----------------------------------------------------
+
+model CustomerCreditMovement {
+  id          String    @id
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId   String?
+  invoice     Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  date        DateTime  @default(now())
+  reason      String?
+  debit       Float     @default(0)
+  credit      Float     @default(0)
+  balance     Float     @default(0)
+  userName    String?
+  createdAt   DateTime  @default(now())
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([date])
+}
+
+// ----------------------------------------------------
+// 8. ENVÍOS, DESPACHOS Y ENTREGAS DE FACTURAS
+// ----------------------------------------------------
+
+model Delivery {
+  id          String         @id
+  invoiceId   String
+  invoice     Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  date        DateTime       @default(now())
+  status      String         @default("ENTREGADO") // "PENDIENTE", "EN_RUTA", "ENTREGADO", "CANCELADO"
+  notes       String?
+  items       DeliveryItem[]
+  createdAt   DateTime       @default(now())
+
+  @@index([invoiceId])
+  @@index([date])
+}
+
+model DeliveryItem {
+  id            String      @id
+  deliveryId    String
+  delivery      Delivery    @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  invoiceItemId String
+  invoiceItem   InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  quantity      Float
+
+  @@index([deliveryId])
+  @@index([invoiceItemId])
+}
+
+// ----------------------------------------------------
+// 9. NOTAS DE CRÉDITO Y DEVOLUCIONES
+// ----------------------------------------------------
+
+model CreditNote {
+  id               String      @id
+  invoiceItemId    String
+  invoiceItem      InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  creditNoteNumber String?
+  quantityReturned Float
+  date             DateTime    @default(now())
+  createdAt        DateTime    @default(now())
+
+  @@index([invoiceItemId])
+  @@index([date])
 }
