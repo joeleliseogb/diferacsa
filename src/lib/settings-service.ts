@@ -104,12 +104,12 @@ const initialPermissions: Record<UserRole, Permission[]> = {
     'Admin': [...allPermissions],
     'Gerente General': [...allPermissions],
     'Gerente de Ventas': [
-        'ver-dashboard', 'usar-asistente-ia', 'acceder-tpv', 'crear-apartados-encargos', 'ver-clientes', 'crear-clientes', 'editar-clientes',
+        'ver-dashboard', 'ver-reportes', 'usar-asistente-ia', 'acceder-tpv', 'crear-apartados-encargos', 'ver-clientes', 'crear-clientes', 'editar-clientes',
         'ver-pedidos', 'crear-pedidos', 'editar-pedidos', 'ver-presupuestos', 'crear-presupuestos', 'editar-presupuestos',
         'ver-entregas', 'crear-entregas', 'editar-entregas', 'acceder-caja'
     ],
     'Gerente de Compras': [
-        'ver-dashboard', 'ver-compras', 'crear-compras', 'editar-compras', 'ver-inventario',
+        'ver-dashboard', 'ver-reportes', 'ver-compras', 'crear-compras', 'editar-compras', 'ver-inventario',
         'ver-proveedores', 'crear-proveedores', 'editar-proveedores'
     ],
     'Gerente de Almacen': [
@@ -133,7 +133,7 @@ const initialPermissions: Record<UserRole, Permission[]> = {
         'acceder-caja'
     ],
     'Contable': [
-        'ver-dashboard', 'acceder-caja', 'acceder-facturacion', 'ver-compras', 'ver-proveedores'
+        'ver-dashboard', 'ver-reportes', 'acceder-caja', 'acceder-facturacion', 'ver-compras', 'ver-proveedores'
     ],
     'Rutero': [
         'ver-entregas', 'editar-entregas'

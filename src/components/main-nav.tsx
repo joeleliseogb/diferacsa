@@ -22,6 +22,7 @@ import {
   HardHat,
   UserCog,
   Wrench,
+  BarChart3,
 } from 'lucide-react'
 import {
   SidebarGroup,
@@ -87,6 +88,7 @@ export function MainNav() {
   const operationsItems = [
     { href: "/invoicing", label: "Facturación", icon: FileText, permission: 'acceder-facturacion' as Permission },
     { href: "/purchases", label: "Compras", icon: Receipt, permission: 'ver-compras' as Permission },
+    { href: "/reports", label: "Reportes y Estadísticas", icon: BarChart3, permission: 'ver-reportes' as Permission },
   ];
 
   const managementItems = [

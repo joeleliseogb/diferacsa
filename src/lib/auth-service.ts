@@ -17,6 +17,7 @@ export const allPermissions = [
     'ver-inventario', 'crear-productos', 'editar-productos', 'realizar-traslados',
     'ver-proveedores', 'crear-proveedores', 'editar-proveedores',
     'acceder-facturacion', 'anular-facturas',
+    'ver-reportes',
     'acceder-configuracion', 'gestionar-usuarios', 'ejecutar-mantenimiento',
     'acceder-taller', 'crear-reparaciones', 'editar-reparaciones',
 ] as const;
