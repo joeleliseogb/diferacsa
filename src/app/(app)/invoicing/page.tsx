@@ -231,7 +231,7 @@ export default function PaginaFacturacion() {
     const sku = product.codes.find(c => c.type === 'SKU')?.value;
     if (!sku) return;
 
-    const priceTierName = selectedInvoiceForReturn?.customer?.priceTier || "Tarifa General";
+    const priceTierName = selectedInvoiceForReturn?.customer?.priceTier || "Normal";
     const price = product.prices.find(p => p.tierName === priceTierName)?.price || 0;
 
     setNewSaleItems(prevItems => {

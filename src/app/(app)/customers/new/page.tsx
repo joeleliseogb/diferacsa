@@ -41,7 +41,7 @@ function FormularioNuevoCliente() {
     type: "Particular",
     nit: "CF",
     fiscalName: "",
-    priceTier: "Tarifa General",
+    priceTier: "Normal",
     creditLimit: "Q0.00",
     creditTerms: "0",
     currentBalance: "Q0.00",

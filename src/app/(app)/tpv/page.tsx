@@ -45,12 +45,53 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 
-type CartItem = OrderProduct & { warehouseId: string; warehouseName: string };
+type CartItem = OrderProduct & { 
+  warehouseId: string; 
+  warehouseName: string;
+  prices?: { tierId?: number; tierName: string; price: number }[];
+};
 type ProductView = 'grid' | 'list';
+
+/**
+ * Normaliza nombres de tarifas ("Normal", "Mayorista", "Especial")
+ * Tolera formatos antiguos como "Tarifa General", "Tarifa Mayorista", "Tarifa Profesional".
+ */
+function normalizeTierName(tier?: string): 'Normal' | 'Mayorista' | 'Especial' {
+  const t = (tier || '').toLowerCase().trim();
+  if (t.includes('mayor')) return 'Mayorista';
+  if (t.includes('especial') || t.includes('profes')) return 'Especial';
+  return 'Normal';
+}
+
+function getProductPriceForTier(product: Product, tierName?: string): number {
+  if (!product.prices || product.prices.length === 0) return 0;
+  const target = normalizeTierName(tierName);
+  
+  const exact = product.prices.find(p => p.tierName.toLowerCase() === (tierName || '').toLowerCase());
+  if (exact) return exact.price;
+
+  const normalized = product.prices.find(p => normalizeTierName(p.tierName) === target);
+  if (normalized) return normalized.price;
+
+  return product.prices[0]?.price || 0;
+}
+
+function getPriceFromPricesList(prices?: { tierId?: number; tierName: string; price: number }[], tierName?: string): number | null {
+  if (!prices || prices.length === 0) return null;
+  const target = normalizeTierName(tierName);
+
+  const exact = prices.find(p => p.tierName.toLowerCase() === (tierName || '').toLowerCase());
+  if (exact) return exact.price;
+
+  const normalized = prices.find(p => normalizeTierName(p.tierName) === target);
+  if (normalized) return normalized.price;
+
+  return prices[0]?.price || null;
+}
 
 const defaultCustomer: Customer = {
   id: "0", name: "Cliente General", email: "", phones: [], type: "Particular", avatar: "CG", nit: "CF", fiscalName: "Consumidor Final",
-  totalSpent: "Q0.00", lastPurchase: "N/A", priceTier: "Tarifa General", creditLimit: "Q0.00", creditTerms: "0",
+  totalSpent: "Q0.00", lastPurchase: "N/A", priceTier: "Normal", creditLimit: "Q0.00", creditTerms: "0",
   currentBalance: "Q0.00", usualPaymentMethod: "Efectivo", maxSalesDiscount: "0%", addresses: [], purchaseHistory: [], notes: '',
 };
 
@@ -96,7 +137,7 @@ function TPVContent() {
   // TPV states
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(defaultCustomer.id);
-  const [activePriceTier, setActivePriceTier] = useState<string>('');
+  const [activePriceTier, setActivePriceTier] = useState<string>('Normal');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -305,7 +346,7 @@ function TPVContent() {
 
   useEffect(() => {
     if (selectedCustomer) {
-        handlePriceTierChange(selectedCustomer.priceTier, true); // Update prices silently
+        handlePriceTierChange(selectedCustomer.priceTier || 'Normal', true); // Update prices silently
         // Pre-select primary address when opening the modal
         const primaryAddress = selectedCustomer.addresses.find(a => a.isPrimary);
         if (primaryAddress) {
@@ -319,13 +360,18 @@ function TPVContent() {
   }, [selectedCustomer]);
 
   const handlePriceTierChange = (newTier: string, silent = false) => {
-    setActivePriceTier(newTier);
+    const normalized = normalizeTierName(newTier);
+    setActivePriceTier(normalized);
     if (cart.length > 0) {
       const updatedCart = cart.map(item => {
+        const fromItemPrices = getPriceFromPricesList(item.prices, normalized);
+        if (fromItemPrices !== null) {
+          return { ...item, price: fromItemPrices };
+        }
         const product = products.find(p => p.codes.some(c => c.value === item.sku));
         if (product) {
-          const newPrice = product.prices.find(p => p.tierName === newTier)?.price || item.price;
-          return { ...item, price: newPrice };
+          const newPrice = getProductPriceForTier(product, normalized);
+          return { ...item, price: newPrice, prices: product.prices };
         }
         return item;
       });
@@ -333,7 +379,7 @@ function TPVContent() {
       if (!silent) {
         toast({
             title: "Tarifas Actualizadas",
-            description: `Los precios del carrito se han actualizado a la tarifa '${newTier}'.`,
+            description: `Los precios del carrito se han actualizado a la tarifa '${normalized}'.`,
         });
       }
     }
@@ -495,10 +541,10 @@ function TPVContent() {
         return;
     }
 
-    const price = product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0;
+    const price = getProductPriceForTier(product, activePriceTier);
 
     if (existingItemInCart) {
-        setCart(cart.map(item => item.sku === sku && item.warehouseId === selectedWarehouseId ? { ...item, qty: finalQuantity } : item));
+        setCart(cart.map(item => item.sku === sku && item.warehouseId === selectedWarehouseId ? { ...item, qty: finalQuantity, price, prices: product.prices } : item));
     } else {
         const newItem: CartItem = { 
             sku, 
@@ -507,7 +553,8 @@ function TPVContent() {
             qtyDelivered: 0, 
             price, 
             warehouseId: selectedWarehouseId,
-            warehouseName: warehouse.name
+            warehouseName: warehouse.name,
+            prices: product.prices,
         };
         setCart(prevCart => [...prevCart, newItem]);
     }
@@ -934,7 +981,7 @@ function TPVContent() {
     }
     
     const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
-    const price = product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0;
+    const price = getProductPriceForTier(product, activePriceTier);
 
     setReservationState({
         product,
@@ -1118,22 +1165,56 @@ function TPVContent() {
                                 </Button>
                               </div>
                             </div>
-                            <div className="flex justify-between items-end mt-auto pt-2 border-t">
-                              <div className="text-xs">
-                                <div className="font-mono text-muted-foreground">{product.codes.find(c => c.type === 'SKU')?.value}</div>
-                                {product.isService ? (
-                                  <div className="font-semibold text-sky-600">Servicio</div>
-                                ) : (
-                                  <>
-                                    <div className={cn("font-semibold flex items-center gap-1.5", !hasStock && "text-destructive")}>
-                                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getWarehouseConfig(selectedWarehouseId).dot)} />
-                                      <span>Disp: {availableForSale}</span>
-                                    </div>
-                                    {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
-                                  </>
-                                )}
+                            <div className="mt-auto pt-2 border-t space-y-1.5">
+                              <div className="flex justify-between items-end">
+                                <div className="text-xs">
+                                  <div className="font-mono text-muted-foreground">{product.codes.find(c => c.type === 'SKU')?.value}</div>
+                                  {product.isService ? (
+                                    <div className="font-semibold text-sky-600">Servicio</div>
+                                  ) : (
+                                    <>
+                                      <div className={cn("font-semibold flex items-center gap-1.5", !hasStock && "text-destructive")}>
+                                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getWarehouseConfig(selectedWarehouseId).dot)} />
+                                        <span>Disp: {availableForSale}</span>
+                                      </div>
+                                      {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
+                                    </>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-sm font-bold text-primary">Q{getProductPriceForTier(product, activePriceTier).toFixed(2)}</span>
+                                </div>
                               </div>
-                              <span className="text-sm font-bold text-primary">Q{(product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0).toFixed(2)}</span>
+                              {product.prices && product.prices.length > 0 && (
+                                <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-border/40 text-center" title="Precios por tarifa: Normal / Mayorista / Especial">
+                                  {[
+                                    { key: 'Normal', label: 'Normal' },
+                                    { key: 'Mayorista', label: 'Mayorista' },
+                                    { key: 'Especial', label: 'Especial' },
+                                  ].map(({ key, label }) => {
+                                    const val = getProductPriceForTier(product, key);
+                                    const isActive = normalizeTierName(activePriceTier) === key;
+                                    return (
+                                      <div
+                                        key={key}
+                                        className={cn(
+                                          "py-0.5 px-0.5 rounded transition-all flex flex-col items-center justify-center leading-none",
+                                          isActive 
+                                            ? "font-bold text-primary bg-primary/10 border border-primary/30 dark:bg-primary/20 shadow-xs" 
+                                            : "text-muted-foreground/80 bg-muted/40"
+                                        )}
+                                      >
+                                        <span className="text-[7.5px] uppercase tracking-wider opacity-70 font-semibold mb-0.5">
+                                          {label === 'Normal' ? 'Norm' : label === 'Mayorista' ? 'Mayo' : 'Esp'}
+                                        </span>
+                                        <span className="text-[9.5px] font-mono font-semibold whitespace-nowrap">
+                                          Q{val.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </Card>
                         );
@@ -1150,14 +1231,14 @@ function TPVContent() {
                         <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">SKU</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">Disp.</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground shadow-[0_1px_0_0_hsl(var(--border))]">Otras Suc.</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground text-right shadow-[0_1px_0_0_hsl(var(--border))]">Precio</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card font-semibold text-foreground text-right shadow-[0_1px_0_0_hsl(var(--border))]">Precio ({normalizeTierName(activePriceTier)})</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredProducts.map(product => {
                         const stockInSelectedWarehouse = product.stock.find(s => s.warehouseId.toString() === selectedWarehouseId)?.quantity || 0;
                         const availableForSale = stockInSelectedWarehouse - (product.reservedStock || 0);
-                        const price = (product.prices.find(p => p.tierName === activePriceTier)?.price || product.prices[0]?.price || 0);
+                        const price = getProductPriceForTier(product, activePriceTier);
                         const stockInOtherWarehouses = product.stock
                           .filter(s => s.warehouseId.toString() !== selectedWarehouseId)
                           .reduce((sum, s) => sum + s.quantity, 0);
@@ -1206,7 +1287,34 @@ function TPVContent() {
                                 </Tooltip>
                               </TooltipProvider>
                             </TableCell>
-                            <TableCell className="text-right font-bold text-primary">Q{price.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-primary text-sm">Q{price.toFixed(2)}</span>
+                                {product.prices && product.prices.length > 0 && (
+                                  <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 font-mono">
+                                    {[
+                                      { key: 'Normal', label: 'Normal' },
+                                      { key: 'Mayorista', label: 'May.' },
+                                      { key: 'Especial', label: 'Esp.' },
+                                    ].map(({ key, label }) => {
+                                      const val = getProductPriceForTier(product, key);
+                                      const isActive = normalizeTierName(activePriceTier) === key;
+                                      return (
+                                        <span
+                                          key={key}
+                                          className={cn(
+                                            "px-1 rounded text-[9.5px]",
+                                            isActive ? "font-bold text-primary bg-primary/10" : "opacity-60"
+                                          )}
+                                        >
+                                          {label}: Q{val.toFixed(2)}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -1398,8 +1506,8 @@ function TPVContent() {
                  <div className="text-sm mt-3 flex justify-between items-center p-2">
                      <Dialog open={priceTierDialogOpen} onOpenChange={setPriceTierDialogOpen}>
                         <DialogTrigger asChild>
-                             <div className="flex items-center gap-2 cursor-pointer">
-                                 <span className="text-muted-foreground">Tarifa: {activePriceTier}</span>
+                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                 <span className="text-muted-foreground font-medium">Tarifa: <strong className="text-primary font-bold">{normalizeTierName(activePriceTier)}</strong></span>
                                 <Tag className="h-4 w-4 text-primary" />
                             </div>
                         </DialogTrigger>
@@ -1411,18 +1519,42 @@ function TPVContent() {
                             <Command className="rounded-lg border shadow-md mt-4">
                                 <CommandList>
                                     <CommandGroup>
-                                        {priceTiers.map(tier => (
-                                            <CommandItem key={tier.id} onSelect={() => handlePriceTierChange(tier.name)}>
-                                                <Check className={cn("mr-2 h-4 w-4", activePriceTier === tier.name ? "opacity-100" : "opacity-0")} />
-                                                <span>{tier.name}</span>
-                                            </CommandItem>
-                                        ))}
+                                        {[
+                                            { name: "Normal", title: "Tarifa Normal", desc: "Precio regular de mostrador (consumidor final)" },
+                                            { name: "Mayorista", title: "Tarifa Mayorista", desc: "Precio con descuento para ventas al por mayor" },
+                                            { name: "Especial", title: "Tarifa Especial", desc: "Tarifa preferencial para clientes frecuentes y proyectos" },
+                                        ].map(tier => {
+                                            const isSelected = normalizeTierName(activePriceTier) === tier.name;
+                                            return (
+                                                <CommandItem 
+                                                    key={tier.name} 
+                                                    onSelect={() => handlePriceTierChange(tier.name)}
+                                                    className={cn("cursor-pointer py-2.5 px-3 flex items-center justify-between", isSelected && "bg-primary/5")}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Check className={cn("h-4 w-4 text-primary", isSelected ? "opacity-100" : "opacity-0")} />
+                                                        <div className="flex flex-col text-left">
+                                                            <span className={cn("text-sm font-semibold", isSelected && "text-primary font-bold")}>{tier.title}</span>
+                                                            <span className="text-xs text-muted-foreground">{tier.desc}</span>
+                                                        </div>
+                                                    </div>
+                                                    {cart.length > 0 && (
+                                                        <span className="text-xs font-mono font-bold text-muted-foreground">
+                                                            Total: Q{cart.reduce((sum, item) => {
+                                                                const pVal = getPriceFromPricesList(item.prices, tier.name) || item.price;
+                                                                return sum + (pVal * item.qty);
+                                                            }, 0).toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                </CommandItem>
+                                            );
+                                        })}
                                     </CommandGroup>
                                 </CommandList>
                             </Command>
-                                <DialogFooter>
+                            <DialogFooter>
                                 <DialogClose asChild>
-                                    <Button type="button" variant="secondary">Cancelar</Button>
+                                    <Button type="button" variant="secondary">Cerrar</Button>
                                 </DialogClose>
                             </DialogFooter>
                         </DialogContent>
@@ -1470,11 +1602,16 @@ function TPVContent() {
                             <TableRow key={`${item.sku}-${item.warehouseId}`}>
                                 <TableCell className="font-medium text-xs leading-tight py-2 px-1 sm:px-2 min-w-0">
                                     <span className="line-clamp-2">{item.name}</span>
-                                    <div className="text-muted-foreground flex items-center gap-1 text-[11px] mt-0.5">
-                                        <span>Q{item.price.toFixed(2)}</span>
-                                        <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'price', item.price)}>
+                                    <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] mt-0.5 flex-wrap">
+                                        <span className="font-bold text-foreground">Q{item.price.toFixed(2)}</span>
+                                        <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => handleOpenCalculator(item.sku, item.warehouseId, 'price', item.price)}>
                                             <Calculator className="h-2.5 w-2.5" />
                                         </Button>
+                                        {item.prices && item.prices.length > 1 && (
+                                            <span className="text-[9.5px] font-mono text-muted-foreground/90 bg-muted/60 dark:bg-muted/30 px-1.5 py-0.5 rounded border border-border/60">
+                                                N: Q{getPriceFromPricesList(item.prices, 'Normal')?.toFixed(2)} • M: Q{getPriceFromPricesList(item.prices, 'Mayorista')?.toFixed(2)} • E: Q{getPriceFromPricesList(item.prices, 'Especial')?.toFixed(2)}
+                                            </span>
+                                        )}
                                     </div>
                                     <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} className="mt-1" />
                                 </TableCell>

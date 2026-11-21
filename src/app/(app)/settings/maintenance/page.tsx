@@ -530,7 +530,7 @@ export default function MaintenancePage() {
             type: "Particular",
             nit: "CF",
             fiscalName: "Cliente de Ejemplo Completo",
-            priceTier: "Tarifa General",
+            priceTier: "Normal",
             creditLimit: "Q1000.00",
             creditTerms: "15",
             currentBalance: "Q0.00",

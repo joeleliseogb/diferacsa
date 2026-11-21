@@ -215,9 +215,11 @@ function sanitizeSettings(settings: Settings): Settings {
     b.name.includes("Sucursal Central") || b.name.includes("Zona 10")
   ) || settings.warehouses?.some(w => 
     w.name.includes("Almacén Central") || w.name.includes("Fraijanes")
+  ) || settings.priceTiers?.some(t => 
+    t.name.includes("Tarifa General") || t.name.includes("Tarifa Profesional")
   );
 
-  if (hasLegacyMock || !settings.branches || settings.branches.length === 0) {
+  if (hasLegacyMock || !settings.branches || settings.branches.length === 0 || !settings.priceTiers || settings.priceTiers.length === 0) {
     settings.branches = JSON.parse(JSON.stringify(initialSettings.branches));
     settings.warehouses = JSON.parse(JSON.stringify(initialSettings.warehouses));
     settings.documentSeries = JSON.parse(JSON.stringify(initialSettings.documentSeries));
@@ -283,6 +285,22 @@ export async function saveBranches(branches: Branch[]): Promise<void> {
 }
 
 export async function getPriceTiers(): Promise<PriceTier[]> {
+  try {
+    if (typeof window !== 'undefined') {
+      const res = await fetch('/api/price-tiers');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          return data.items.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+          }));
+        }
+      }
+    }
+  } catch {
+    // fallback to stored settings
+  }
   const settings = await getSettings();
   return settings.priceTiers;
 }
