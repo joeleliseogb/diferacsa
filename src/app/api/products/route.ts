@@ -171,11 +171,14 @@ export async function GET(request: NextRequest) {
 
 function formatProducts(dbProducts: any[]): Product[] {
   return dbProducts.map((p) => {
-    const stockList = p.stocks.map((s: any) => ({
-      warehouseId: 1,
-      warehouseName: 'Bodega Principal / Sala de Ventas',
-      quantity: s.quantity,
-    }));
+    const stockList = p.stocks.map((s: any) => {
+      const isWh2 = s.warehouseId === 'wh-matriz-2' || s.warehouseId === '2';
+      return {
+        warehouseId: isWh2 ? 2 : 1,
+        warehouseName: isWh2 ? 'Bodega Secundaria / Material Pesado' : 'Bodega Principal / Sala de Ventas',
+        quantity: s.quantity,
+      };
+    });
 
     const priceList = p.prices.map((pr: any, idx: number) => ({
       tierId: idx + 1,

@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AdvancedCalculator } from '@/components/advanced-calculator';
 import Image from 'next/image';
 import { Badge } from "@/components/ui/badge";
+import { WarehouseBadge, BranchBadge, getWarehouseConfig, getBranchConfig } from "@/components/location-badge";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -1040,14 +1041,86 @@ function TPVContent() {
                 </div>
             </div>
              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                    <SelectTrigger className="min-w-[170px] max-w-[240px] rounded-xl border-border/80 shadow-xs"><Building className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Sucursal..."/></SelectTrigger>
-                    <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}</SelectContent>
-                </Select>
-                 <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
-                    <SelectTrigger className="min-w-[170px] max-w-[240px] rounded-xl border-border/80 shadow-xs"><Warehouse className="h-4 w-4 mr-2 shrink-0" /><SelectValue placeholder="Almacén..."/></SelectTrigger>
-                    <SelectContent>{filteredWarehouses.map(w => <SelectItem key={w.id} value={w.id.toString()}>{w.name}</SelectItem>)}</SelectContent>
-                </Select>
+                {(() => {
+                  const currentBranch = branches.find(b => b.id.toString() === selectedBranchId);
+                  const brConfig = getBranchConfig(currentBranch?.id || currentBranch?.name);
+                  const BrIcon = brConfig.Icon;
+                  return (
+                    <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+                        <SelectTrigger className={cn(
+                            "h-9 px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all min-w-[160px] max-w-[220px]",
+                            brConfig.bg, brConfig.text, brConfig.border
+                        )}>
+                            <div className="flex items-center gap-2 truncate">
+                                <span className={cn("w-2 h-2 rounded-full shrink-0", brConfig.dot)} />
+                                <BrIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate font-semibold">{brConfig.shortName}</span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {branches.map(b => {
+                                const bConf = getBranchConfig(b.id || b.name);
+                                const BIcon = bConf.Icon;
+                                return (
+                                    <SelectItem key={b.id} value={b.id.toString()} className="cursor-pointer">
+                                        <div className="flex items-center gap-2 py-0.5">
+                                            <span className={cn("w-2 h-2 rounded-full shrink-0", bConf.dot)} />
+                                            <BIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <div className="flex flex-col text-left">
+                                                <span className="font-semibold text-xs">{bConf.shortName}</span>
+                                                <span className="text-[10px] text-muted-foreground">{b.name}</span>
+                                            </div>
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                  );
+                })()}
+
+                {(() => {
+                  const currentWh = filteredWarehouses.find(w => w.id.toString() === selectedWarehouseId);
+                  const whConfig = getWarehouseConfig(currentWh?.id || currentWh?.name);
+                  const WhIcon = whConfig.Icon;
+                  return (
+                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId} disabled={!selectedBranchId}>
+                        <SelectTrigger className={cn(
+                            "h-9 px-3 rounded-xl border font-medium text-xs shadow-2xs transition-all min-w-[175px] max-w-[240px]",
+                            whConfig.bg, whConfig.text, whConfig.border
+                        )}>
+                            <div className="flex items-center gap-2 truncate">
+                                <span className={cn("w-2 h-2 rounded-full shrink-0", whConfig.dot)} />
+                                <WhIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate font-semibold">{whConfig.code}: {whConfig.shortName}</span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {filteredWarehouses.map(w => {
+                                const wConf = getWarehouseConfig(w.id || w.name);
+                                const WIcon = wConf.Icon;
+                                return (
+                                    <SelectItem key={w.id} value={w.id.toString()} className="cursor-pointer">
+                                        <div className="flex items-center gap-2 py-0.5">
+                                            <span className={cn("w-2 h-2 rounded-full shrink-0", wConf.dot)} />
+                                            <WIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <div className="flex flex-col text-left">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={cn("px-1 py-0.2 rounded text-[9px] font-bold border", wConf.badgeClass)}>
+                                                        {wConf.code}
+                                                    </span>
+                                                    <span className="font-semibold text-xs">{wConf.shortName}</span>
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground">{w.name}</span>
+                                            </div>
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                  );
+                })()}
                  <Dialog open={parkedSalesDialogOpen} onOpenChange={setParkedSalesDialogOpen}>
                     <DialogTrigger asChild>
                         <Button variant="outline" className="rounded-xl border-border/80 shadow-xs relative">
@@ -1184,7 +1257,10 @@ function TPVContent() {
                                   <div className="font-semibold text-sky-600">Servicio</div>
                                 ) : (
                                   <>
-                                    <div className={cn("font-semibold", !hasStock && "text-destructive")}>Disp: {availableForSale}</div>
+                                    <div className={cn("font-semibold flex items-center gap-1.5", !hasStock && "text-destructive")}>
+                                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getWarehouseConfig(selectedWarehouseId).dot)} />
+                                      <span>Disp: {availableForSale}</span>
+                                    </div>
                                     {(product.reservedStock || 0) > 0 && <div className="text-amber-600">Res: {product.reservedStock}</div>}
                                   </>
                                 )}
@@ -1231,13 +1307,32 @@ function TPVContent() {
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className={cn(stockInOtherWarehouses > 0 ? "font-semibold text-blue-600" : "text-muted-foreground")}>
-                                      {product.isService ? 'N/A' : stockInOtherWarehouses}
+                                    <span className={cn("inline-flex items-center gap-1 font-semibold", stockInOtherWarehouses > 0 ? "text-primary cursor-help" : "text-muted-foreground")}>
+                                      {stockInOtherWarehouses > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary/70 shrink-0" />}
+                                      <span>{product.isService ? 'N/A' : stockInOtherWarehouses}</span>
                                     </span>
                                   </TooltipTrigger>
-                                  {otherWarehousesStockDetails && (
-                                    <TooltipContent>
-                                      <pre className="text-xs">{otherWarehousesStockDetails}</pre>
+                                  {product.stock.filter(s => s.warehouseId.toString() !== selectedWarehouseId && s.quantity > 0).length > 0 && (
+                                    <TooltipContent className="p-2 space-y-1.5 min-w-[190px]">
+                                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                                        Existencias en otras bodegas:
+                                      </p>
+                                      {product.stock
+                                        .filter(s => s.warehouseId.toString() !== selectedWarehouseId && s.quantity > 0)
+                                        .map(s => {
+                                          const conf = getWarehouseConfig(s.warehouseId || s.warehouseName);
+                                          const SIcon = conf.Icon;
+                                          return (
+                                            <div key={s.warehouseId} className="flex items-center justify-between gap-3 text-xs">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", conf.dot)} />
+                                                <SIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                                <span className="font-medium">{conf.shortName}:</span>
+                                              </div>
+                                              <span className="font-bold text-foreground">{s.quantity}</span>
+                                            </div>
+                                          );
+                                        })}
                                     </TooltipContent>
                                   )}
                                 </Tooltip>
@@ -1513,7 +1608,7 @@ function TPVContent() {
                                             <Calculator className="h-3 w-3" />
                                         </Button>
                                     </div>
-                                    <Badge variant="outline" className="mt-1">{item.warehouseName}</Badge>
+                                    <WarehouseBadge warehouseId={item.warehouseId} warehouseName={item.warehouseName} className="mt-1" />
                                 </TableCell>
                                 <TableCell className="py-2">
                                     <div className="flex items-center gap-1">
@@ -1747,7 +1842,9 @@ function TPVContent() {
                       <TableBody>
                         {selectedProductForDetail.stock.map(s => (
                           <TableRow key={s.warehouseId}>
-                            <TableCell className="text-sm">{s.warehouseName}</TableCell>
+                            <TableCell className="text-sm py-2">
+                              <WarehouseBadge warehouseId={s.warehouseId} warehouseName={s.warehouseName} />
+                            </TableCell>
                             <TableCell className="text-right font-semibold">{s.quantity}</TableCell>
                           </TableRow>
                         ))}
