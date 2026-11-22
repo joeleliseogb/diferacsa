@@ -1632,32 +1632,7 @@ function TPVContent() {
                               </TooltipProvider>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex flex-col items-end">
-                                <span className="font-bold text-primary text-sm">Q{price.toFixed(2)}</span>
-                                {product.prices && product.prices.length > 0 && (
-                                  <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 font-mono">
-                                    {[
-                                      { key: 'Normal', label: 'Normal' },
-                                      { key: 'Mayorista', label: 'May.' },
-                                      { key: 'Especial', label: 'Esp.' },
-                                    ].map(({ key, label }) => {
-                                      const val = getProductPriceForTier(product, key);
-                                      const isActive = normalizeTierName(activePriceTier) === key;
-                                      return (
-                                        <span
-                                          key={key}
-                                          className={cn(
-                                            "px-1 rounded text-[9.5px]",
-                                            isActive ? "font-bold text-primary bg-primary/10" : "opacity-60"
-                                          )}
-                                        >
-                                          {label}: Q{val.toFixed(2)}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
+                              <span className="font-bold text-primary text-sm">Q{price.toFixed(2)}</span>
                             </TableCell>
                           </TableRow>
                         );
