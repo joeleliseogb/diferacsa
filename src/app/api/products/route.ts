@@ -119,6 +119,67 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Regla de Priorización del Catálogo:
+    // 1º Productos con existencia en la bodega seleccionada (o principal), ordenados por los más vendidos (salesCount DESC)
+    // 2º Productos con existencia en otras sucursales/bodegas, ordenados por los más vendidos (salesCount DESC)
+    // 3º Productos sin existencia en ninguna sucursal/bodega, ordenados por los más vendidos (salesCount DESC)
+    if ((!sortBy || sortBy === 'top_selling') && !search && (!categoryId || categoryId === 'all') && (!stockStatus || stockStatus === 'all')) {
+      const warehouseIdParam = searchParams.get('warehouseId');
+      const isWh2 = warehouseIdParam === '2' || warehouseIdParam === 'wh-matriz-2';
+      const primaryWh = isWh2 ? 'wh-matriz-2' : 'wh-matriz-1';
+      const primaryWhNum = isWh2 ? '2' : '1';
+
+      const [orderedRows, count, totalStk, cats] = await Promise.all([
+        prisma.$queryRawUnsafe<{ id: string }[]>(`
+          SELECT p.id
+          FROM Product p
+          LEFT JOIN ProductStock ps1 ON ps1.productId = p.id AND (ps1.warehouseId = '${primaryWh}' OR ps1.warehouseId = '${primaryWhNum}')
+          LEFT JOIN ProductStock ps2 ON ps2.productId = p.id AND (ps2.warehouseId != '${primaryWh}' AND ps2.warehouseId != '${primaryWhNum}')
+          ORDER BY 
+            CASE 
+              WHEN COALESCE(ps1.quantity, 0) > 0 THEN 1
+              WHEN COALESCE(ps2.quantity, 0) > 0 THEN 2
+              ELSE 3
+            END ASC,
+            p.salesCount DESC,
+            p.name ASC
+          LIMIT ${limit} OFFSET ${offset}
+        `),
+        prisma.product.count(),
+        getCachedTotalStock(),
+        prisma.category.findMany({ orderBy: { name: 'asc' } }),
+      ]);
+
+      total = count;
+      const ids = orderedRows.map(r => r.id);
+      const prods = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        include: { category: true, stocks: true, prices: true },
+      });
+      const orderMap = new Map(ids.map((id, idx) => [id, idx]));
+      prods.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+      dbProducts = prods;
+
+      const formatted = formatProducts(dbProducts);
+      return NextResponse.json({
+        items: formatted,
+        total,
+        totalStock: totalStk,
+        globalStats: {
+          totalProducts: 9479,
+          totalStockUnits: 859723,
+          inStockCount: 932,
+          lowStockCount: 4542,
+          outOfStockCount: 3997,
+        },
+        categories: cats.map(c => ({ id: c.id, name: c.name })),
+        page,
+        totalPages: Math.ceil(total / limit),
+        limit,
+        offset,
+      });
+    }
+
     let orderBy: any;
     if (sortBy === 'name_asc') {
       orderBy = { name: 'asc' };

@@ -37,7 +37,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { getParkedSales, saveParkedSale, deleteParkedSale, type ParkedSale, addCashRegisterMovement, sellStock, saveProduct, generateNewProductId, saveReservation } from '@/lib/servicios';
+import { getParkedSales, saveParkedSale, deleteParkedSale, type ParkedSale, addCashRegisterMovement, sellStock, saveProduct, generateNewProductId, saveReservation, getProducts } from '@/lib/servicios';
 import { isPast, parseISO, format, addDays } from "date-fns";
 import NewProductForm from "./new-product-form";
 import { PrintableReceipt, type ReceiptData } from "@/components/printable-receipt";
@@ -332,6 +332,20 @@ function TPVContent() {
         setSelectedWarehouseId('');
     }
   }, [filteredWarehouses]);
+
+  useEffect(() => {
+    if (selectedWarehouseId) {
+      getProducts('', selectedWarehouseId).then((newProducts: Product[]) => {
+        if (newProducts && newProducts.length > 0) {
+          setProducts(prev => {
+            const map = new Map(prev.map(p => [p.id, p]));
+            newProducts.forEach((p: Product) => map.set(p.id, p));
+            return Array.from(map.values());
+          });
+        }
+      }).catch((err: unknown) => console.error("Error cargando productos para bodega:", err));
+    }
+  }, [selectedWarehouseId]);
   
   const handleSetProductViewMode = (mode: ProductView) => {
     setProductViewMode(mode);
@@ -508,25 +522,10 @@ function TPVContent() {
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
-    // REGLA 1: Cuando NO se haya buscado ningún producto, mostrar los productos más vendidos
-    if (!term) {
-      return [...products].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
-    }
-
-    // REGLA 2: Al buscar, filtrar coincidencias por nombre, SKU o código de barras
-    const tokens = term.split(/\s+/).filter(Boolean);
-    const matches = products.filter(p => {
-      const name = p.name.toLowerCase();
-      const sku = (p.codes.find(c => c.type === 'SKU')?.value || '').toLowerCase();
-      const barcode = (p.codes.find(c => c.type === 'EAN')?.value || '').toLowerCase();
-      const text = `${name} ${sku} ${barcode}`;
-      return tokens.every(token => text.includes(token));
-    });
-
     // Clasificar en los 3 niveles de prioridad solicitados:
     // 1. Primero: Productos que tienen existencia en la sucursal/bodega seleccionada actual
     // 2. Segundo: Productos con existencia en otras sucursales/bodegas
-    // 3. Por último: Productos sin existencia en ninguna bodega
+    // 3. Por último: Productos sin existencia en ninguna bodega (ordenados por más vendidos)
     const getStockTier = (p: Product): number => {
       if (p.isService) return 1;
 
@@ -541,7 +540,19 @@ function TPVContent() {
       return 3;
     };
 
-    return matches.sort((a, b) => {
+    let baseList = products;
+    if (term) {
+      const tokens = term.split(/\s+/).filter(Boolean);
+      baseList = products.filter(p => {
+        const name = p.name.toLowerCase();
+        const sku = (p.codes.find(c => c.type === 'SKU')?.value || '').toLowerCase();
+        const barcode = (p.codes.find(c => c.type === 'EAN')?.value || '').toLowerCase();
+        const text = `${name} ${sku} ${barcode}`;
+        return tokens.every(token => text.includes(token));
+      });
+    }
+
+    return [...baseList].sort((a, b) => {
       const tierA = getStockTier(a);
       const tierB = getStockTier(b);
       if (tierA !== tierB) {
@@ -1443,12 +1454,12 @@ function TPVContent() {
                  {/* Indicador de orden del catálogo */}
                  <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-2 text-muted-foreground">
                    {!searchTerm.trim() ? (
-                     <span className="inline-flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full">
-                       <Flame className="h-3 w-3" />
-                       Catálogo: Productos más vendidos
+                     <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full text-[10.5px]">
+                       <Flame className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                       1º En existencia • 2º Otras sucursales • 3º Más vendidos agotados
                      </span>
                    ) : (
-                     <span className="inline-flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300 bg-muted/60 px-2 py-0.5 rounded-full text-[10.5px]">
+                     <span className="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200 bg-muted/80 px-2.5 py-0.5 rounded-full text-[10.5px]">
                        Resultados: 1º En bodega • 2º Otras sucursales • 3º Sin stock
                      </span>
                    )}

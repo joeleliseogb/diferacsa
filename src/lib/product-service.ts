@@ -82,11 +82,12 @@ export async function getProducts_server(): Promise<Product[]> {
 }
 
 
-export async function getProducts(searchTerm?: string): Promise<Product[]> {
+export async function getProducts(searchTerm?: string, warehouseId?: string): Promise<Product[]> {
     try {
+        const whParam = warehouseId ? `&warehouseId=${encodeURIComponent(warehouseId)}` : '';
         const url = typeof window !== 'undefined' 
-            ? `/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200` 
-            : `http://localhost:9002/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200`;
+            ? `/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200${whParam}` 
+            : `http://localhost:9002/api/products?search=${encodeURIComponent(searchTerm || '')}&limit=200${whParam}`;
         const res = await fetch(url);
         if (res.ok) {
             const data = await res.json();

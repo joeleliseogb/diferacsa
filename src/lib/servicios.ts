@@ -82,7 +82,7 @@ export const updateDeliveryRoute = (updatedRoute: deliveryService.DeliveryRoute)
 export { getProducts_server };
 
 // --- Product Service (Client-safe) ---
-export const getProducts = (searchTerm?: string) => productService.getProducts(searchTerm);
+export const getProducts = (searchTerm?: string, warehouseId?: string) => productService.getProducts(searchTerm, warehouseId);
 
 export const getProduct = (id: string) => productService.getProduct(id);
 export const saveProduct = (productToSave: Product) => productService.saveProduct(productToSave);
